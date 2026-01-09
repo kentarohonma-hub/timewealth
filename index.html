@@ -132,7 +132,7 @@
 
         const getRankInfo = (totalDays) => {
             if (totalDays >= 300) return { id: 'gold', name: 'Gold', color: 'bg-gradient-to-r from-yellow-300 to-yellow-500', text: 'text-yellow-600', icon: '👑', next: null, target: 300 };
-            if (totalDays >= 100) return { id: 'silver', name: 'Silver', color: 'bg-gradient-to-r from-gray-200 to-gray-400', text: 'text-gray-600', icon: '🥈', next: 'Gold', target: 300 };
+            if (totalDays >= 100) return { id: 'silver', name: 'Silver', color: 'bg-gradient-to-r from-gray-200 to-gray-400', text: 'text-gray-600', icon: '🥉', next: 'Gold', target: 300 };
             if (totalDays >= 30) return { id: 'bronze', name: 'Bronze', color: 'bg-gradient-to-r from-orange-200 to-orange-400', text: 'text-orange-700', icon: '🥉', next: 'Silver', target: 100 };
             return { id: 'beginner', name: 'Beginner', color: 'bg-gradient-to-r from-green-200 to-green-400', text: 'text-green-700', icon: '🔰', next: 'Bronze', target: 30 };
         };
