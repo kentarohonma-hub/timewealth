@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TimeWellth V39 - Management</title>
+    <title>TimeWellth V40</title>
     
     <div id="debug-console" style="display:none; position:fixed; top:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#ff5555; padding:10px; z-index:9999; font-size:12px; max-height:200px; overflow:auto;"></div>
     <script>
@@ -33,21 +33,23 @@
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .brand-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
         button { touch-action: manipulation; }
-        .role-badge-master { background-color: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
-        .role-badge-premium { background-color: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
-        .role-badge-standard { background-color: #64748b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        /* 権限バッジ */
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold; margin-left: 5px; }
+        .badge-master { background-color: #ef4444; }
+        .badge-premium { background-color: #f59e0b; }
+        .badge-standard { background-color: #94a3b8; }
     </style>
 </head>
 <body>
     <div id="root">
         <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#666;">
-            <div style="font-weight:bold; font-size:20px; margin-bottom:10px;">TimeWellth V39</div>
-            <div>Loading System...</div>
+            <div style="font-weight:bold; font-size:20px; margin-bottom:10px;">TimeWellth</div>
+            <div>Starting App...</div>
         </div>
     </div>
 
     <script type="text/babel">
-        // --- 1. Firebase Configuration ---
+        // 1. Firebase Configuration
         const firebaseConfig = {
           apiKey: "AIzaSyA8WmG0d4w_H3PFIOC3oENuuCnD3AEFY2w",
           authDomain: "timewellth.firebaseapp.com",
@@ -66,8 +68,8 @@
 
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- 2. Constants ---
-        const MASTER_EMAIL = "kentaro.honma@genova.co.jp"; // マスター権限
+        // 2. Constants
+        const MASTER_EMAIL = "kentaro.honma@genova.co.jp";
 
         const CATEGORIES = [
             { id: 'meeting', name: '会議/打合せ', color: 'bg-blue-500', code: '#3b82f6' },
@@ -93,11 +95,22 @@
             const days = ['日','月','火','水','木','金','土'];
             return `${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
         };
+        const getTodayFullDate = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+        };
 
-        // --- 3. Custom Hooks ---
+        const getRankInfo = (totalDays) => {
+            if (totalDays >= 300) return { id: 'gold', name: 'Gold', color: 'bg-gradient-to-r from-yellow-300 to-yellow-500', text: 'text-yellow-600', icon: '👑', next: null, target: 300 };
+            if (totalDays >= 100) return { id: 'silver', name: 'Silver', color: 'bg-gradient-to-r from-gray-200 to-gray-400', text: 'text-gray-600', icon: '🥈', next: 'Gold', target: 300 };
+            if (totalDays >= 30) return { id: 'bronze', name: 'Bronze', color: 'bg-gradient-to-r from-orange-200 to-orange-400', text: 'text-orange-700', icon: '🥉', next: 'Silver', target: 100 };
+            return { id: 'beginner', name: 'Beginner', color: 'bg-gradient-to-r from-green-200 to-green-400', text: 'text-green-700', icon: '🔰', next: 'Bronze', target: 30 };
+        };
+
+        // 3. Hooks (V39の管理機能を維持)
         const useFirebaseData = () => {
             const [user, setUser] = useState(null);
-            const [userData, setUserData] = useState(null); // { name, role, teamMembers: [], ... }
+            const [userData, setUserData] = useState(null);
             const [allData, setAllData] = useState({});
             const [loading, setLoading] = useState(true);
 
@@ -105,28 +118,22 @@
                 const unsubAuth = auth.onAuthStateChanged(async (u) => {
                     if (u) {
                         setUser(u);
-                        // ユーザー情報監視
+                        // User Data
                         db.collection("users").doc(u.uid).onSnapshot(doc => {
                             if (doc.exists) {
-                                const data = doc.data();
-                                // マスター権限の強制付与チェック
-                                if (u.email === MASTER_EMAIL && data.role !== 'master') {
+                                const d = doc.data();
+                                if (u.email === MASTER_EMAIL && d.role !== 'master') {
                                     db.collection("users").doc(u.uid).update({ role: 'master' });
                                 }
-                                setUserData(data);
+                                setUserData(d);
                             } else {
-                                // 新規ユーザー登録
                                 const initialRole = u.email === MASTER_EMAIL ? 'master' : 'standard';
                                 db.collection("users").doc(u.uid).set({
-                                    name: u.displayName || "No Name",
-                                    email: u.email,
-                                    role: initialRole, 
-                                    teamMembers: [],
-                                    createdAt: new Date()
+                                    name: u.displayName || "No Name", email: u.email, role: initialRole, teamMembers: [], createdAt: new Date()
                                 }, { merge: true });
                             }
                         });
-                        // 自分のログ監視
+                        // Log Data
                         db.collection("users").doc(u.uid).collection("data").doc("logs").onSnapshot(doc => {
                             setAllData(doc.exists ? (doc.data().data || {}) : {});
                         });
@@ -138,13 +145,11 @@
                 return () => unsubAuth();
             }, []);
 
-            // 汎用データ保存
             const saveData = async (newData, targetUid = null) => {
                 const uid = targetUid || user.uid;
                 await db.collection("users").doc(uid).collection("data").doc("logs").set({ data: newData }, { merge: true });
             };
 
-            // ユーザー検索 (全ユーザー取得してフィルタリング: 小規模向け実装)
             const searchUsers = async (query) => {
                 const snapshot = await db.collection("users").get();
                 const users = [];
@@ -152,7 +157,6 @@
                 return users.filter(u => u.name.includes(query) || (u.email && u.email.includes(query)));
             };
 
-            // チームメンバー追加
             const addTeamMember = async (memberUid) => {
                 if (!userData.teamMembers?.includes(memberUid)) {
                     const newMembers = [...(userData.teamMembers || []), memberUid];
@@ -160,23 +164,17 @@
                 }
             };
 
-            // チームメンバー削除
             const removeTeamMember = async (memberUid) => {
                 const newMembers = userData.teamMembers.filter(id => id !== memberUid);
                 await db.collection("users").doc(user.uid).update({ teamMembers: newMembers });
             };
 
-            // 他人のデータを取得
             const fetchMemberData = async (uid) => {
                 const userDoc = await db.collection("users").doc(uid).get();
                 const logDoc = await db.collection("users").doc(uid).collection("data").doc("logs").get();
-                return {
-                    info: userDoc.data(),
-                    logs: logDoc.exists ? logDoc.data().data : {}
-                };
+                return { info: userDoc.data(), logs: logDoc.exists ? logDoc.data().data : {} };
             };
 
-            // 権限変更 (Masterのみ)
             const updateUserRole = async (uid, newRole) => {
                 await db.collection("users").doc(uid).update({ role: newRole });
             };
@@ -187,14 +185,13 @@
             return { user, userData, allData, loading, saveData, searchUsers, addTeamMember, removeTeamMember, fetchMemberData, updateUserRole, loginGoogle, logout };
         };
 
-        // --- 4. Sub Components ---
+        // 4. Components (V38 UI Base)
 
-        // ログイン画面
         const LoginScreen = ({ onLogin }) => (
             <div className="min-h-screen brand-gradient flex flex-col items-center justify-center p-6 text-white animate-fade-in">
                 <div className="bg-white/10 backdrop-blur-lg p-10 rounded-3xl border border-white/20 shadow-2xl max-w-sm w-full text-center">
                     <h1 className="text-3xl font-black mb-2">TimeWellth</h1>
-                    <p className="text-blue-100 mb-8 text-sm">組織のパフォーマンスを最大化する</p>
+                    <p className="text-blue-100 mb-8 text-sm">あなたの行動を資産に変える</p>
                     <button onClick={onLogin} className="w-full bg-white text-gray-700 font-bold py-3 rounded-xl shadow-lg hover:bg-gray-50 transition transform hover:scale-105 flex items-center justify-center gap-3">
                         <i className="fab fa-google"></i> Googleでログイン
                     </button>
@@ -202,30 +199,30 @@
             </div>
         );
 
-        // バッジ表示
+        // V38 Style SetupScreen (Logic for display name setup if needed, mostly handled by Google Login now)
+        const SetupScreen = () => <div className="h-screen flex items-center justify-center">Setting up...</div>;
+
+        // V38 Style Role Badge
         const RoleBadge = ({ role }) => {
-            const style = role === 'master' ? 'role-badge-master' : role === 'premium' ? 'role-badge-premium' : 'role-badge-standard';
-            const label = role === 'master' ? 'MASTER' : role === 'premium' ? 'PREMIUM' : 'STANDARD';
-            return <span className={style}>{label}</span>;
+            const labels = { master: "MASTER", premium: "PREMIUM", standard: "STANDARD" };
+            const styles = { master: "badge-master", premium: "badge-premium", standard: "badge-standard" };
+            return <span className={`badge ${styles[role]}`}>{labels[role]}</span>;
         };
 
-        // チーム管理・一覧画面 (Premium/Master用)
+        // チーム管理画面 (UIはV38風にシンプル化)
         const TeamScreen = ({ user, userData, searchUsers, addTeamMember, removeTeamMember, onViewMembers }) => {
             const [searchTerm, setSearchTerm] = useState("");
             const [searchResults, setSearchResults] = useState([]);
             const [teamList, setTeamList] = useState([]);
             const [selectedMembers, setSelectedMembers] = useState([]);
 
-            // チームメンバー情報の取得
             useEffect(() => {
                 const loadTeam = async () => {
                     if (userData.teamMembers && userData.teamMembers.length > 0) {
                         const promises = userData.teamMembers.map(uid => db.collection("users").doc(uid).get());
                         const docs = await Promise.all(promises);
                         setTeamList(docs.map(d => ({ uid: d.id, ...d.data() })));
-                    } else {
-                        setTeamList([]);
-                    }
+                    } else { setTeamList([]); }
                 };
                 loadTeam();
             }, [userData.teamMembers]);
@@ -233,7 +230,7 @@
             const handleSearch = async () => {
                 if(!searchTerm) return;
                 const res = await searchUsers(searchTerm);
-                setSearchResults(res.filter(u => u.uid !== user.uid)); // 自分は除外
+                setSearchResults(res.filter(u => u.uid !== user.uid));
             };
 
             const toggleSelect = (uid) => {
@@ -242,100 +239,69 @@
             };
 
             return (
-                <div className="p-4 pb-24 md:p-8 max-w-5xl mx-auto w-full">
-                    <h2 className="text-xl font-bold text-gray-700 mb-4">チーム管理</h2>
-                    
-                    {/* メンバー検索・追加 */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
+                <div className="p-4 pb-24 max-w-5xl mx-auto w-full">
+                    <h2 className="font-bold text-xl mb-4 text-gray-700">チーム管理</h2>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
                         <div className="flex gap-2 mb-2">
-                            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 border p-2 rounded" placeholder="名前またはメールで検索" />
-                            <button onClick={handleSearch} className="bg-blue-600 text-white px-4 rounded">検索</button>
+                            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 border p-2 rounded text-sm" placeholder="名前/メールで検索" />
+                            <button onClick={handleSearch} className="bg-blue-600 text-white px-4 rounded text-sm font-bold">検索</button>
                         </div>
                         {searchResults.length > 0 && (
-                            <ul className="border rounded divide-y">
+                            <ul className="border rounded divide-y text-sm">
                                 {searchResults.map(u => (
                                     <li key={u.uid} className="p-2 flex justify-between items-center">
-                                        <span>{u.name} <span className="text-xs text-gray-400">({u.email})</span></span>
-                                        <button onClick={() => { addTeamMember(u.uid); setSearchResults([]); setSearchTerm(""); }} className="text-blue-600 text-sm font-bold">+ 追加</button>
+                                        <span>{u.name}</span>
+                                        <button onClick={() => { addTeamMember(u.uid); setSearchResults([]); setSearchTerm(""); }} className="text-blue-600 font-bold">+ 追加</button>
                                     </li>
                                 ))}
                             </ul>
                         )}
                     </div>
-
-                    {/* チームリスト & 選択 */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold">登録メンバー ({teamList.length})</h3>
-                            <button 
-                                onClick={() => onViewMembers(selectedMembers)} 
-                                disabled={selectedMembers.length === 0}
-                                className={`px-4 py-2 rounded font-bold text-white transition ${selectedMembers.length > 0 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-300'}`}
-                            >
-                                {selectedMembers.length}名を表示
-                            </button>
+                            <h3 className="font-bold text-sm">メンバー ({teamList.length})</h3>
+                            <button onClick={() => onViewMembers(selectedMembers)} disabled={selectedMembers.length===0} className={`px-3 py-1 rounded text-xs font-bold text-white ${selectedMembers.length>0?'bg-green-600':'bg-gray-300'}`}>表示</button>
                         </div>
-                        <ul className="divide-y">
+                        <ul className="divide-y text-sm">
                             {teamList.map(member => (
                                 <li key={member.uid} className="py-3 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <input type="checkbox" checked={selectedMembers.includes(member.uid)} onChange={() => toggleSelect(member.uid)} className="w-5 h-5 text-blue-600" />
-                                        <div>
-                                            <div className="font-bold text-gray-800">{member.name}</div>
-                                            <div className="text-xs text-gray-500">{member.email}</div>
-                                        </div>
+                                        <input type="checkbox" checked={selectedMembers.includes(member.uid)} onChange={() => toggleSelect(member.uid)} />
+                                        <div><div className="font-bold">{member.name}</div><div className="text-xs text-gray-400">{member.email}</div></div>
                                     </div>
                                     <button onClick={() => removeTeamMember(member.uid)} className="text-red-400 text-xs">解除</button>
                                 </li>
                             ))}
-                            {teamList.length === 0 && <li className="text-gray-400 text-center py-4">メンバーがいません</li>}
                         </ul>
                     </div>
                 </div>
             );
         };
 
-        // アカウント管理 (Masterのみ)
+        // アカウント管理画面 (UIはV38風)
         const AdminScreen = ({ searchUsers, updateUserRole }) => {
             const [users, setUsers] = useState([]);
-            
-            useEffect(() => {
-                const loadAll = async () => {
-                    const res = await searchUsers(""); // 全件取得
-                    setUsers(res);
-                };
-                loadAll();
-            }, []);
-
+            useEffect(() => { searchUsers("").then(setUsers); }, []);
             const changeRole = async (uid, currentRole) => {
-                if (currentRole === 'master') { alert("マスター権限は変更できません"); return; }
+                if (currentRole === 'master') return;
                 const newRole = currentRole === 'standard' ? 'premium' : 'standard';
-                if (confirm(`${newRole.toUpperCase()}権限に変更しますか？`)) {
+                if (confirm(`${newRole}権限に変更しますか？`)) {
                     await updateUserRole(uid, newRole);
                     setUsers(users.map(u => u.uid === uid ? { ...u, role: newRole } : u));
                 }
             };
-
             return (
-                <div className="p-4 pb-24 md:p-8 max-w-5xl mx-auto w-full">
-                    <h2 className="text-xl font-bold text-gray-700 mb-4">アカウント管理 (Master)</h2>
-                    <div className="bg-white rounded-xl shadow overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-600 font-bold">
-                                <tr><th className="p-3">名前</th><th className="p-3">権限</th><th className="p-3">操作</th></tr>
-                            </thead>
+                <div className="p-4 pb-24 max-w-5xl mx-auto w-full">
+                    <h2 className="font-bold text-xl mb-4 text-gray-700">アカウント管理</h2>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden text-sm">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">権限</th><th className="p-3">操作</th></tr></thead>
                             <tbody className="divide-y">
                                 {users.map(u => (
                                     <tr key={u.uid}>
-                                        <td className="p-3">{u.name}<div className="text-xs text-gray-400">{u.email}</div></td>
+                                        <td className="p-3">{u.name}</td>
                                         <td className="p-3"><RoleBadge role={u.role} /></td>
-                                        <td className="p-3">
-                                            {u.role !== 'master' && (
-                                                <button onClick={() => changeRole(u.uid, u.role)} className="text-blue-600 underline">
-                                                    {u.role === 'standard' ? 'Premiumへ' : 'Standardへ'}
-                                                </button>
-                                            )}
-                                        </td>
+                                        <td className="p-3">{u.role !== 'master' && <button onClick={() => changeRole(u.uid, u.role)} className="text-blue-600 underline">変更</button>}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -345,90 +311,56 @@
             );
         };
 
-        // マルチビューア (重要機能)
-        const MultiViewScreen = ({ targetUids, fetchMemberData, user: currentUser, saveData }) => {
+        // マルチビュー画面 (V38 DailyScreenのデザインを横並びにする)
+        const MultiViewScreen = ({ targetUids, fetchMemberData, saveData }) => {
             const [membersData, setMembersData] = useState([]);
             const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
 
             useEffect(() => {
-                const load = async () => {
-                    const data = await Promise.all(targetUids.map(uid => fetchMemberData(uid)));
-                    // UIDをデータに付与して管理
+                Promise.all(targetUids.map(uid => fetchMemberData(uid))).then(data => {
                     setMembersData(data.map((d, i) => ({ ...d, uid: targetUids[i] })));
-                };
-                load();
-            }, [targetUids, currentDate]); // 日付が変わったら再取得は...本来はallDataを監視すべきだが簡易実装として
+                });
+            }, [targetUids, currentDate]);
 
-            const changeDate = (diff) => {
-                const d = new Date(currentDate); d.setDate(d.getDate() + diff);
-                setCurrentDate(formatDate(d));
-            };
-
-            // 上司コメント保存
-            const saveSupervisorComment = async (targetUid, comment) => {
+            const changeDate = (diff) => { const d = new Date(currentDate); d.setDate(d.getDate() + diff); setCurrentDate(formatDate(d)); };
+            const saveComment = async (targetUid, comment) => {
                 const targetMember = membersData.find(m => m.uid === targetUid);
-                const dayData = targetMember.logs[currentDate] || {};
-                const newData = { ...dayData, supervisorComment: comment };
-                
-                // Firestore保存
-                await saveData(newData, targetUid); // 他人のIDを指定して保存
-                alert("コメントを保存しました");
+                const dayLog = targetMember.logs[currentDate] || {};
+                await saveData({ ...dayLog, supervisorComment: comment }, targetUid);
+                alert("保存しました");
             };
 
             return (
                 <div className="flex flex-col h-full overflow-hidden">
-                    <div className="bg-white p-3 border-b flex justify-between items-center shadow-sm z-10">
+                    <div className="bg-white p-3 border-b flex justify-between items-center shadow-sm z-10 shrink-0">
                         <button onClick={() => changeDate(-1)} className="p-2"><i className="fas fa-chevron-left"></i></button>
-                        <h2 className="font-bold">{currentDate} の行動記録</h2>
+                        <h2 className="font-bold">{currentDate}</h2>
                         <button onClick={() => changeDate(1)} className="p-2"><i className="fas fa-chevron-right"></i></button>
                     </div>
-                    
-                    <div className="flex-1 overflow-x-auto overflow-y-hidden">
-                        <div className="flex h-full" style={{ minWidth: membersData.length * 320 + 'px' }}>
+                    <div className="flex-1 overflow-x-auto bg-[#f8fafc]">
+                        <div className="flex h-full" style={{ minWidth: membersData.length * 300 + 'px' }}>
                             {membersData.map(member => {
                                 const dayLog = member.logs[currentDate] || {};
-                                const { actuals = {}, plans = {}, reflection = {}, supervisorComment = "" } = dayLog;
-                                
                                 return (
                                     <div key={member.uid} className="w-80 border-r flex flex-col h-full bg-white shrink-0">
                                         <div className="p-2 bg-gray-50 border-b font-bold text-center text-blue-900 sticky top-0">{member.info.name}</div>
                                         <div className="flex-1 overflow-y-auto p-2">
-                                            {/* ログ表示 */}
-                                            <div className="text-xs text-gray-500 mb-2 font-bold text-center">--- 行動ログ ---</div>
                                             {TIME_SLOTS.map(time => (
-                                                <div key={time} className="flex border-b h-8 text-[10px] items-center">
+                                                <div key={time} className="flex border-b h-10 text-[10px] items-center">
                                                     <div className="w-10 text-gray-400">{time}</div>
-                                                    <div className="flex-1 px-1">{actuals[time] && <span className={`px-1 rounded text-white ${CATEGORIES.find(c=>c.id===actuals[time].cat)?.color}`}>{actuals[time].text}</span>}</div>
+                                                    <div className="flex-1 px-1">{dayLog.actuals?.[time] && <span className={`px-1 rounded text-white ${CATEGORIES.find(c=>c.id===dayLog.actuals[time].cat)?.color}`}>{dayLog.actuals[time].text}</span>}</div>
                                                 </div>
                                             ))}
-                                            
-                                            {/* 日報 & コメントエリア */}
                                             <div className="mt-4 border-t pt-2 space-y-2">
-                                                <div className="bg-blue-50 p-2 rounded">
-                                                    <div className="font-bold text-xs text-blue-600">AM振り返り</div>
-                                                    <div className="text-xs">{reflection.am || '(なし)'}</div>
-                                                </div>
-                                                <div className="bg-indigo-50 p-2 rounded">
-                                                    <div className="font-bold text-xs text-indigo-600">PM総括</div>
-                                                    <div className="text-xs">{reflection.pm || '(なし)'}</div>
-                                                </div>
+                                                <div className="bg-blue-50 p-2 rounded"><div className="font-bold text-xs text-blue-600">AM</div><div className="text-xs">{dayLog.reflection?.am || '-'}</div></div>
+                                                <div className="bg-indigo-50 p-2 rounded"><div className="font-bold text-xs text-indigo-600">PM</div><div className="text-xs">{dayLog.reflection?.pm || '-'}</div></div>
                                                 <div className="bg-green-50 p-2 rounded border border-green-200">
                                                     <div className="font-bold text-xs text-green-700 mb-1">上司コメント</div>
-                                                    <textarea 
-                                                        id={`comment-${member.uid}`} 
-                                                        className="w-full text-xs border rounded p-1" 
-                                                        rows="3" 
-                                                        defaultValue={supervisorComment}
-                                                    ></textarea>
-                                                    <button 
-                                                        onClick={() => saveSupervisorComment(member.uid, document.getElementById(`comment-${member.uid}`).value)}
-                                                        className="mt-1 w-full bg-green-600 text-white text-xs py-1 rounded"
-                                                    >
-                                                        送信
-                                                    </button>
+                                                    <textarea id={`cmt-${member.uid}`} className="w-full text-xs border rounded p-1" rows="2" defaultValue={dayLog.supervisorComment || ""}></textarea>
+                                                    <button onClick={() => saveComment(member.uid, document.getElementById(`cmt-${member.uid}`).value)} className="mt-1 w-full bg-green-600 text-white text-xs py-1 rounded">送信</button>
                                                 </div>
                                             </div>
-                                            <div className="h-20"></div>
+                                            <div className="h-10"></div>
                                         </div>
                                     </div>
                                 );
@@ -439,43 +371,169 @@
             );
         };
 
-        // --- 5. Main App Structure ---
+        // --- V38のデザインを完全再現したDailyScreen ---
+        const DailyScreen = ({ user, currentDate, setCurrentDate, allData, setAllData, onSlotClick, onSaveReflection, isReflectOpen, setIsReflectOpen }) => {
+            const chartRef = useRef(null); const canvasRef = useRef(null); const scrollRef = useRef(null);
+            const dayData = allData[currentDate] || { actuals: {}, plans: {}, reflection: { am: "", pm: "" } };
+            const { actuals, plans, reflection, supervisorComment } = dayData;
+            
+            useEffect(() => {
+                if (scrollRef.current) { const h = new Date().getHours(); scrollRef.current.scrollTop = (h - 8) * 60; }
+            }, []);
+
+            useEffect(() => { if (canvasRef.current) { if (chartRef.current) chartRef.current.destroy(); const counts = {}; CATEGORIES.forEach(c => counts[c.name] = 0); Object.values(actuals || {}).forEach(item => { const cat = CATEGORIES.find(c => c.id === item.cat); if (cat) counts[cat.name] += 30; }); const ctx = canvasRef.current.getContext('2d'); chartRef.current = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts).map(k => k.substring(0,4)), datasets: [{ label: '時間(分)', data: Object.values(counts), backgroundColor: CATEGORIES.map(c => c.code), borderRadius: 4, barThickness: 20 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true, grid: {display: false} }, y: { display: true, beginAtZero: true } } } }); } }, [actuals]);
+
+            const changeDate = (diff) => { const d = new Date(currentDate); d.setDate(d.getDate() + diff); setCurrentDate(formatDate(d)); };
+            const handleSaveReflect = () => { onSaveReflection(document.getElementById('am-area').value, document.getElementById('pm-area').value); setIsReflectOpen(false); };
+            const exportCSV = () => { let csvContent = "\uFEFF日付,社員名,時間帯,カテゴリー,内容詳細\n"; const sortedTimes = TIME_SLOTS.filter(t => actuals?.[t]); if (sortedTimes.length === 0) { alert("データなし"); return; } sortedTimes.forEach(time => { const rec = actuals[time]; const cat = CATEGORIES.find(c => c.id === rec.cat); csvContent += `${currentDate},${user.name},${time},${cat ? cat.name : "不明"},"${rec.text}"\n`; }); const link = document.createElement("a"); link.href = encodeURI("data:text/csv;charset=utf-8," + csvContent); link.download = `log_${currentDate}.csv`; document.body.appendChild(link); link.click(); };
+
+            return (
+                <div className="flex flex-col h-full relative">
+                    <div className="flex items-center justify-between bg-white p-3 border-b shadow-sm z-30 shrink-0"><button onClick={() => changeDate(-1)} className="p-2"><i className="fas fa-chevron-left"></i></button><h2 className="font-bold text-lg">{getDisplayDate(currentDate)}</h2><button onClick={() => changeDate(1)} className="p-2"><i className="fas fa-chevron-right"></i></button></div>
+                    <div className="bg-white p-4 shadow-sm border-b z-10 shrink-0 h-48 md:h-64"><canvas ref={canvasRef}></canvas></div>
+                    <div className="flex-1 overflow-y-auto relative bg-[#f8fafc]" ref={scrollRef}>
+                        <div className="flex text-xs md:text-sm font-bold text-gray-500 bg-gray-50 py-3 sticky top-0 z-10 border-b"><div className="w-12 md:w-20 text-center">Time</div><div className="flex-1 text-center">Plan</div><div className="flex-1 text-center">Actual</div></div>
+                        {TIME_SLOTS.map(time => (
+                            <div key={time} className="flex border-b border-gray-200 h-14 bg-white relative hover:bg-gray-50 transition">
+                                <div className="w-12 md:w-20 text-xs md:text-sm text-gray-400 flex justify-center items-start pt-1 border-r border-gray-100 bg-gray-50 shrink-0">{time}</div>
+                                <div className="flex-1 p-1 border-r border-gray-100 cursor-pointer relative group" onClick={() => onSlotClick(time, 'plan')}>{plans?.[time] ? <div className={`h-full rounded px-2 py-1 text-[10px] md:text-xs text-white leading-tight flex items-center ${CATEGORIES.find(c=>c.id===plans[time].cat)?.color}`}>{plans[time].text}</div> : <div className="h-full flex items-center justify-center text-gray-100 text-lg group-hover:text-gray-300 transition">+</div>}</div>
+                                <div className="flex-1 p-1 cursor-pointer relative group" onClick={() => onSlotClick(time, 'actual')}>{actuals?.[time] ? <div className={`h-full rounded px-2 py-1 text-[10px] md:text-xs text-white leading-tight flex items-center ${CATEGORIES.find(c=>c.id===actuals[time].cat)?.color}`}>{actuals[time].text}</div> : <div className="h-full flex items-center justify-center text-gray-100 text-lg group-hover:text-gray-300 transition">+</div>}</div>
+                            </div>
+                        ))}
+                        {/* 上司コメント表示 (V39機能) */}
+                        {supervisorComment && <div className="m-4 p-4 bg-green-50 border border-green-200 rounded-xl"><div className="font-bold text-green-700 text-sm mb-1"><i className="fas fa-comment-dots"></i> 上司コメント</div><p className="text-sm text-gray-800">{supervisorComment}</p></div>}
+                        <div className="h-24"></div>
+                    </div>
+                    <div className="absolute bottom-6 right-6 md:bottom-10 md:right-10 flex flex-col gap-3 items-end z-30">
+                        <button onClick={exportCSV} className="bg-white text-green-600 border border-green-200 rounded-full w-12 h-12 shadow-lg flex items-center justify-center hover:bg-green-50 transition"><i className="fas fa-file-csv text-xl"></i></button>
+                        <button onClick={() => setIsReflectOpen(true)} className="bg-blue-600 text-white rounded-full px-6 py-4 shadow-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition transform hover:scale-105"><i className="fas fa-edit"></i> 日報</button>
+                    </div>
+                    {isReflectOpen && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center justify-center">
+                            <div className="bg-white w-full max-w-md md:max-w-lg rounded-t-2xl md:rounded-2xl p-6 animate-slide-up max-h-[85vh] overflow-y-auto shadow-2xl">
+                                <div className="flex justify-between items-center mb-6 border-b pb-2"><h3 className="font-bold text-xl text-gray-700">📝 日報</h3><button onClick={() => setIsReflectOpen(false)} className="bg-gray-100 w-8 h-8 rounded-full text-gray-500 hover:bg-gray-200">×</button></div>
+                                <div className="space-y-5">
+                                    <div><label className="text-sm font-bold text-blue-600 block mb-2">☀️ AM</label><textarea id="am-area" className="w-full text-sm p-3 rounded-lg border border-blue-200 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none" rows="3" defaultValue={reflection?.am}></textarea></div>
+                                    <div><label className="text-sm font-bold text-indigo-600 block mb-2">🌙 PM</label><textarea id="pm-area" className="w-full text-sm p-3 rounded-lg border border-indigo-200 bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none" rows="4" defaultValue={reflection?.pm}></textarea></div>
+                                    <button onClick={handleSaveReflect} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-2 hover:bg-slate-900 transition">保存</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // HomeScreen (V38デザイン + 管理ボタン追加)
+        const HomeScreen = ({ user, todayStr, allData, onViewChange }) => {
+            const totalLogs = useMemo(() => {
+                if (!allData) return 0;
+                return Object.keys(allData).filter(k => allData[k].actuals && Object.keys(allData[k].actuals).length > 0).length;
+            }, [allData]);
+            const rank = getRankInfo(totalLogs);
+            const isPremium = user.role === 'master' || user.role === 'premium';
+            const isMaster = user.role === 'master';
+
+            return (
+                <div className="p-4 pb-24 md:p-8 animate-fade-in max-w-5xl mx-auto w-full">
+                    <div className={`rounded-2xl p-6 md:p-10 text-white shadow-xl mb-8 relative overflow-hidden ${rank.id === 'gold' ? 'bg-gradient-to-br from-yellow-600 to-yellow-400' : 'brand-gradient'}`}>
+                        <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl md:text-9xl"><i className="fas fa-chart-line"></i></div>
+                        <div className="flex flex-col md:flex-row justify-between items-start gap-6 relative z-10">
+                            <div><h2 className="text-2xl font-bold mb-2">こんにちは、{user.name}さん</h2><p className="text-white/90 text-sm font-medium">{getDisplayDate(todayStr)}</p></div>
+                            <div className="bg-white/95 backdrop-blur rounded-xl p-5 text-gray-800 shadow-lg w-full md:w-80">
+                                <div className="flex justify-between items-center mb-2"><span className="text-[10px] font-bold text-gray-400 tracking-wider">CURRENT RANK</span><span className="text-[10px] font-bold text-gray-400 tracking-wider">TOTAL LOGS</span></div>
+                                <div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><span className="text-3xl">{rank.icon}</span><span className={`text-2xl font-black ${rank.text}`}>{rank.name}</span></div><div className="text-right"><span className="text-3xl font-bold">{totalLogs}</span><span className="text-xs text-gray-500 font-bold"> days</span></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    {/* メインメニュー (V38風のグリッド配置) */}
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100"><p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wide">Streak</p><p className="text-2xl font-bold text-slate-700">1 <span className="text-xs text-slate-400">days</span></p></div>
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100"><p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wide">Logs</p><p className="text-2xl font-bold text-slate-700">{totalLogs} <span className="text-xs text-slate-400">days</span></p></div>
+                        
+                        {/* 管理メニュー (権限がある場合のみ表示、デザインは統一) */}
+                        {isPremium && (
+                            <div onClick={() => onViewChange('team')} className="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100 cursor-pointer col-span-2 flex items-center justify-between hover:bg-green-100 transition">
+                                <div><p className="text-xs text-green-600 font-bold mb-1 uppercase">Management</p><p className="text-lg font-bold text-green-800">チームの行動記録</p></div>
+                                <i className="fas fa-users text-2xl text-green-300"></i>
+                            </div>
+                        )}
+                        {isMaster && (
+                            <div onClick={() => onViewChange('admin')} className="bg-gray-50 p-5 rounded-xl shadow-sm border border-gray-200 cursor-pointer col-span-2 flex items-center justify-between hover:bg-gray-100 transition">
+                                <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Admin</p><p className="text-lg font-bold text-gray-800">アカウント管理</p></div>
+                                <i className="fas fa-cog text-2xl text-gray-300"></i>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // History Screen (V38 Design)
+        const HistoryScreen = ({ currentDate, onSelectDate, allData }) => {
+            const [viewDate, setViewDate] = useState(new Date(currentDate));
+            const changeMonth = (diff) => { const d = new Date(viewDate); d.setMonth(d.getMonth() + diff); setViewDate(d); };
+            const generateCalendar = () => { const year = viewDate.getFullYear(); const month = viewDate.getMonth(); const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const days = []; for (let i = 0; i < firstDay.getDay(); i++) { days.push(null); } for (let i = 1; i <= lastDay.getDate(); i++) { days.push(new Date(year, month, i)); } return days; };
+            const calendarDays = generateCalendar();
+
+            return (
+                <div className="p-4 pb-24 md:p-8 animate-fade-in max-w-5xl mx-auto w-full">
+                    <div className="flex justify-between items-end mb-4"><h2 className="font-bold text-gray-700 text-xl">履歴</h2></div>
+                    <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
+                        <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg">{viewDate.getFullYear()}年 {viewDate.getMonth() + 1}月</h3><div className="flex gap-2 text-gray-500"><button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded"><i className="fas fa-chevron-left"></i></button><button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded"><i className="fas fa-chevron-right"></i></button></div></div>
+                        <div className="grid grid-cols-7 gap-2 text-center text-sm mb-2 text-gray-400 font-bold"><div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div></div>
+                        <div className="grid grid-cols-7 gap-2 text-center text-sm">
+                            {calendarDays.map((date, i) => {
+                                if (!date) return <div key={i}></div>;
+                                const dateStr = formatDate(date);
+                                const hasData = allData[dateStr] && Object.keys(allData[dateStr].actuals || {}).length > 0;
+                                const isSelected = dateStr === currentDate;
+                                return (<div key={i} onClick={() => onSelectDate(dateStr)} className={`h-12 md:h-16 flex flex-col items-center justify-center rounded-lg transition cursor-pointer border ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:border-gray-200 hover:bg-gray-50'}`}><span className={`text-sm ${isSelected ? 'font-bold text-blue-600' : 'text-gray-600'}`}>{date.getDate()}</span>{hasData && <div className="flex gap-0.5 mt-1"><div className="w-1.5 h-1.5 rounded-full bg-green-400"></div></div>}</div>);
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // App Main
         const App = () => {
             const { user, userData, allData, loading, saveData, searchUsers, addTeamMember, removeTeamMember, fetchMemberData, updateUserRole, loginGoogle, logout } = useFirebaseData();
             const [view, setView] = useState('home');
             const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
-            const [viewMembers, setViewMembers] = useState([]); // 閲覧対象のUIDリスト
+            const [viewMembers, setViewMembers] = useState([]);
 
-            // 既存のDailyScreenロジック用
+            // Modal States
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [selectedTime, setSelectedTime] = useState(null);
             const [inputType, setInputType] = useState(null);
             const [inputText, setInputText] = useState("");
             const [isReflectOpen, setIsReflectOpen] = useState(false);
 
-            if (loading) return <div id="loader">Loading...</div>;
+            if (loading) return <div id="loader"><div className="text-xl font-bold text-gray-600 mb-2">TimeWellth</div><div className="text-sm text-gray-400">Loading...</div></div>;
             if (!user) return <LoginScreen onLogin={loginGoogle} />;
             if (!userData) return <div className="h-screen flex items-center justify-center">Account Setup...</div>;
 
-            // 権限チェック
-            const isPremium = userData.role === 'master' || userData.role === 'premium';
-            const isMaster = userData.role === 'master';
-
-            // --- 既存機能のハンドラ ---
+            // Handlers
             const handleSave = (catId) => {
                 const text = inputText.trim() === "" ? CATEGORIES.find(c => c.id === catId).name : inputText;
                 const data = { text, cat: catId };
                 const dayData = allData[currentDate] || { plans: {}, actuals: {}, reflection: {} };
-                if (inputType === 'plan') dayData.plans = { ...dayData.plans, [selectedTime]: data };
-                else dayData.actuals = { ...dayData.actuals, [selectedTime]: data };
+                if (inputType === 'plan') {
+                    dayData.plans = { ...dayData.plans, [selectedTime]: data };
+                } else {
+                    dayData.actuals = { ...dayData.actuals, [selectedTime]: data };
+                }
                 saveData({ ...allData, [currentDate]: dayData });
                 setIsModalOpen(false); setInputText("");
             };
+
             const handleReflection = (am, pm) => {
                 const dayData = allData[currentDate] || { plans: {}, actuals: {}, reflection: {} };
                 saveData({ ...allData, [currentDate]: { ...dayData, reflection: { am, pm } } });
                 setIsReflectOpen(false);
             };
+
             const handleSlotClick = (time, type) => {
                 setSelectedTime(time); setInputType(type);
                 const dayData = allData[currentDate] || { plans: {}, actuals: {} };
@@ -484,111 +542,46 @@
                 setIsModalOpen(true);
             };
 
-            // チーム画面からの遷移
-            const handleViewTeam = (uids) => {
-                setViewMembers(uids);
-                setView('multiview');
-            };
+            const handleSelectDate = (dateStr) => { setCurrentDate(dateStr); setView('daily'); };
+            const handleViewTeam = (uids) => { setViewMembers(uids); setView('multiview'); };
 
             return (
                 <div className="flex flex-col h-screen overflow-hidden">
                     <div className={`text-white p-4 flex justify-between items-center shrink-0 z-40 shadow-md brand-gradient`}>
-                        <div className="flex items-center gap-2">
-                            <h1 className="font-bold text-lg">TimeWellth</h1>
-                            <RoleBadge role={userData.role} />
-                        </div>
+                        <div className="flex items-center gap-2"><h1 className="font-bold text-lg">TimeWellth</h1><RoleBadge role={userData.role} /></div>
                         <button onClick={logout} className="text-[10px] md:text-xs bg-white/20 px-3 py-1.5 rounded text-white/90 hover:bg-white/30 transition border border-white/10">ログアウト</button>
                     </div>
 
                     <div className="flex-1 overflow-hidden relative w-full bg-[#f8fafc]">
-                        {view === 'home' && (
-                            <div className="p-4 pb-24">
-                                <div className="bg-white rounded-xl p-6 shadow-sm mb-4">
-                                    <h2 className="text-xl font-bold mb-2">こんにちは、{userData.name}さん</h2>
-                                    <div className="text-gray-500 text-sm">{formatDate(new Date())}</div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div onClick={()=>setView('daily')} className="bg-blue-600 text-white p-4 rounded-xl shadow cursor-pointer text-center font-bold">
-                                        <i className="fas fa-calendar-day block text-2xl mb-2"></i>行動記録
-                                    </div>
-                                    <div onClick={()=>setView('history')} className="bg-indigo-600 text-white p-4 rounded-xl shadow cursor-pointer text-center font-bold">
-                                        <i className="fas fa-history block text-2xl mb-2"></i>履歴
-                                    </div>
-                                    {isPremium && (
-                                        <div onClick={()=>setView('team')} className="bg-green-600 text-white p-4 rounded-xl shadow cursor-pointer text-center font-bold col-span-2">
-                                            <i className="fas fa-users block text-2xl mb-2"></i>チームの行動記録
-                                        </div>
-                                    )}
-                                    {isMaster && (
-                                        <div onClick={()=>setView('admin')} className="bg-gray-800 text-white p-4 rounded-xl shadow cursor-pointer text-center font-bold col-span-2">
-                                            <i className="fas fa-user-cog block text-2xl mb-2"></i>アカウント管理
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'daily' && (
-                            <div className="h-full overflow-y-auto">
-                                <div className="flex justify-between p-2 bg-white border-b sticky top-0 z-10">
-                                    <button onClick={()=>{const d=new Date(currentDate);d.setDate(d.getDate()-1);setCurrentDate(formatDate(d))}}>&lt;</button>
-                                    <span className="font-bold">{currentDate}</span>
-                                    <button onClick={()=>{const d=new Date(currentDate);d.setDate(d.getDate()+1);setCurrentDate(formatDate(d))}}>&gt;</button>
-                                </div>
-                                {TIME_SLOTS.map(time => {
-                                    const d = allData[currentDate] || {};
-                                    return (
-                                        <div key={time} className="flex border-b h-12 bg-white text-xs">
-                                            <div className="w-12 border-r flex items-center justify-center bg-gray-50 text-gray-400">{time}</div>
-                                            <div className="flex-1 border-r p-1" onClick={()=>handleSlotClick(time,'plan')}>{d.plans?.[time] && <span className={`px-1 rounded text-white ${CATEGORIES.find(c=>c.id===d.plans[time].cat)?.color}`}>{d.plans[time].text}</span>}</div>
-                                            <div className="flex-1 p-1" onClick={()=>handleSlotClick(time,'actual')}>{d.actuals?.[time] && <span className={`px-1 rounded text-white ${CATEGORIES.find(c=>c.id===d.actuals[time].cat)?.color}`}>{d.actuals[time].text}</span>}</div>
-                                        </div>
-                                    );
-                                })}
-                                {/* 上司コメント表示 */}
-                                {(allData[currentDate]?.supervisorComment) && (
-                                    <div className="m-4 p-4 bg-green-50 border border-green-200 rounded-xl">
-                                        <div className="font-bold text-green-700 mb-1"><i className="fas fa-comment-dots"></i> 上司からのコメント</div>
-                                        <p className="text-sm text-gray-800">{allData[currentDate].supervisorComment}</p>
-                                    </div>
-                                )}
-                                <div className="h-20"></div>
-                                <button onClick={()=>setIsReflectOpen(true)} className="fixed bottom-20 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg font-bold">日報</button>
-                            </div>
-                        )}
-
+                        {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
+                        {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
+                        {view === 'history' && <HistoryScreen currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} onSelectDate={handleSelectDate} />}
                         {view === 'team' && <TeamScreen user={user} userData={userData} searchUsers={searchUsers} addTeamMember={addTeamMember} removeTeamMember={removeTeamMember} onViewMembers={handleViewTeam} />}
                         {view === 'admin' && <AdminScreen searchUsers={searchUsers} updateUserRole={updateUserRole} />}
-                        {view === 'multiview' && <MultiViewScreen targetUids={viewMembers} fetchMemberData={fetchMemberData} user={user} saveData={saveData} />}
-                        
-                        {/* Historyは省略（V37と同じ構造なので、必要ならここに差し戻します） */}
-                        {view === 'history' && <div className="p-4 text-center mt-10">履歴画面 (実装はV37準拠)</div>}
+                        {view === 'multiview' && <MultiViewScreen targetUids={viewMembers} fetchMemberData={fetchMemberData} saveData={saveData} />}
                     </div>
 
-                    <div className="bg-white border-t flex justify-around py-3 pb-safe z-40 shrink-0">
-                        <button onClick={()=>setView('home')} className={`text-2xl ${view==='home'?'text-blue-600':'text-gray-400'}`}><i className="fas fa-home"></i></button>
-                        <button onClick={()=>{setCurrentDate(formatDate(new Date()));setView('daily')}} className={`text-2xl ${view==='daily'?'text-blue-600':'text-gray-400'}`}><i className="fas fa-calendar-day"></i></button>
-                        {isPremium && <button onClick={()=>setView('team')} className={`text-2xl ${view==='team'?'text-blue-600':'text-gray-400'}`}><i className="fas fa-users"></i></button>}
-                    </div>
-
-                    {isModalOpen && (
-                        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-                            <div className="bg-white w-full max-w-md rounded-t-2xl p-5">
-                                <div className="flex justify-between mb-4"><h3 className="font-bold">{selectedTime}</h3><button onClick={()=>setIsModalOpen(false)}>×</button></div>
-                                <input className="w-full border p-2 mb-4 rounded" value={inputText} onChange={e=>setInputText(e.target.value)} autoFocus />
-                                <div className="grid grid-cols-3 gap-2">{CATEGORIES.map(c=><button key={c.id} onClick={()=>handleSave(c.id)} className={`${c.color} text-white p-2 rounded text-xs`}>{c.name}</button>)}</div>
-                            </div>
+                    {/* V38 Footer (Home, Daily, History only visible on standard views) */}
+                    {(view === 'home' || view === 'daily' || view === 'history') && (
+                        <div className="md:hidden shrink-0 bg-white border-t border-gray-200 flex justify-around py-2 pb-safe z-40">
+                            <button onClick={() => setView('home')} className={`flex flex-col items-center p-2 flex-1 ${view === 'home' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">ホーム</span></button>
+                            <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`flex flex-col items-center p-2 flex-1 ${view === 'daily' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-calendar-day text-xl mb-1"></i><span className="text-[10px] font-bold">行動記録</span></button>
+                            <button onClick={() => setView('history')} className={`flex flex-col items-center p-2 flex-1 ${view === 'history' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-history text-xl mb-1"></i><span className="text-[10px] font-bold">履歴</span></button>
                         </div>
                     )}
-                    {isReflectOpen && (
-                        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-                            <div className="bg-white w-full max-w-md rounded-t-2xl p-5">
-                                <h3 className="font-bold mb-4">日報</h3>
-                                <div className="space-y-4">
-                                    <div><label className="text-xs font-bold text-blue-600">AM</label><textarea id="am-in" className="w-full border p-2" rows="2" defaultValue={allData[currentDate]?.reflection?.am}></textarea></div>
-                                    <div><label className="text-xs font-bold text-indigo-600">PM</label><textarea id="pm-in" className="w-full border p-2" rows="3" defaultValue={allData[currentDate]?.reflection?.pm}></textarea></div>
-                                    <button onClick={()=>{handleReflection(document.getElementById('am-in').value, document.getElementById('pm-in').value)}} className="w-full bg-slate-800 text-white py-3 rounded font-bold">保存</button>
-                                </div>
+                    {/* Management view Footer (Back button) */}
+                    {(view === 'team' || view === 'admin' || view === 'multiview') && (
+                        <div className="md:hidden shrink-0 bg-white border-t border-gray-200 flex justify-around py-2 pb-safe z-40">
+                            <button onClick={() => setView('home')} className="flex flex-col items-center p-2 flex-1 text-gray-500"><i className="fas fa-arrow-left text-xl mb-1"></i><span className="text-[10px] font-bold">戻る</span></button>
+                        </div>
+                    )}
+
+                    {isModalOpen && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50">
+                            <div className="bg-white w-full max-w-md md:max-w-lg rounded-t-2xl md:rounded-2xl p-5 animate-slide-up shadow-2xl">
+                                <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-700">{selectedTime} の{inputType === 'plan' ? '予定' : '実績'}</h3><button onClick={() => setIsModalOpen(false)} className="bg-gray-100 w-8 h-8 rounded-full text-gray-500 hover:bg-gray-200">×</button></div>
+                                <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-lg mb-4 outline-none focus:ring-2 focus:ring-blue-500" placeholder="内容を入力..." autoFocus />
+                                <div className="grid grid-cols-3 gap-2">{CATEGORIES.map(cat => <button key={cat.id} onClick={() => handleSave(cat.id)} className={`${cat.color} text-white py-3 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition flex flex-col items-center justify-center hover:opacity-90`}>{cat.name}</button>)}</div>
                             </div>
                         </div>
                     )}
