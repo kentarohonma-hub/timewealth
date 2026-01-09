@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TimeWellth V45</title>
+    <title>TimeWellth V47</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -25,6 +25,26 @@
         .brand-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
         button { touch-action: manipulation; }
         
+        /* 赤線（現在時刻） */
+        .current-time-line { 
+            position: absolute; 
+            left: 0; 
+            right: 0; 
+            border-top: 2px solid #ef4444; 
+            z-index: 50; 
+            pointer-events: none; 
+        }
+        .current-time-ball {
+            position: absolute;
+            left: -6px;
+            top: -5px;
+            width: 10px;
+            height: 10px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+        }
+
         /* 権限バッジ */
         .badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; color: white; font-weight: bold; letter-spacing: 0.05em; display: inline-block; }
         .badge-master { background-color: #ef4444; }
@@ -32,7 +52,7 @@
         .badge-standard { background-color: #94a3b8; }
 
         /* 3段階スイッチ */
-        .role-switch { display: inline-flex; background: #e2e8f0; border-radius: 6px; padding: 2px; border: 1px solid #cbd5e1; }
+        .role-switch { display: inline-flex; background: #f1f5f9; border-radius: 6px; padding: 2px; border: 1px solid #cbd5e1; }
         .role-btn { 
             padding: 4px 8px; 
             font-size: 10px; 
@@ -40,16 +60,14 @@
             border-radius: 4px; 
             cursor: pointer; 
             color: #64748b; 
-            transition: all 0.2s;
+            transition: all 0.1s;
             margin: 0 1px;
         }
-        .role-btn:hover { background: #cbd5e1; }
+        .role-btn:hover { background: #e2e8f0; }
         .role-btn.active { background: white; color: #0f172a; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        
-        /* 選択時の色強調 */
-        .role-btn.active.role-master { color: #ef4444; border-bottom: 2px solid #ef4444; }
-        .role-btn.active.role-premium { color: #f59e0b; border-bottom: 2px solid #f59e0b; }
-        .role-btn.active.role-standard { color: #64748b; border-bottom: 2px solid #94a3b8; }
+        .role-btn.active-master { color: #ef4444; border-bottom: 2px solid #ef4444; }
+        .role-btn.active-premium { color: #f59e0b; border-bottom: 2px solid #f59e0b; }
+        .role-btn.active-standard { color: #64748b; border-bottom: 2px solid #94a3b8; }
     </style>
 </head>
 <body>
@@ -106,6 +124,10 @@
             const d = new Date(dateStr);
             const days = ['日','月','火','水','木','金','土'];
             return `${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
+        };
+        const getTodayFullDate = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
         };
 
         const getRankInfo = (totalDays) => {
@@ -214,7 +236,6 @@
             return <span className={`badge ${styles[safeRole]}`}>{labels[safeRole]}</span>;
         };
 
-        // ★3段階トグルスイッチ
         const RoleSwitch = ({ currentRole, onChange }) => {
             const roles = [
                 { id: 'standard', label: 'Std' },
@@ -228,11 +249,77 @@
                         <div 
                             key={r.id}
                             onClick={() => onChange(r.id)}
-                            className={`role-btn ${safeCurrent === r.id ? 'active role-' + r.id : ''}`}
+                            className={`role-btn ${safeCurrent === r.id ? 'active active-' + r.id : ''}`}
                         >
                             {r.label}
                         </div>
                     ))}
+                </div>
+            );
+        };
+
+        const AnalyticsModal = ({ onClose, allData, viewDate }) => {
+            const [activeTab, setActiveTab] = useState('week'); 
+            const canvasRef = useRef(null); const chartInstance = useRef(null);
+
+            const stats = useMemo(() => {
+                const result = {}; CATEGORIES.forEach(c => result[c.id] = 0);
+                let startDate, endDate;
+                if (activeTab === 'week') {
+                    const today = new Date(); const day = today.getDay();
+                    startDate = new Date(today); startDate.setDate(today.getDate() - day); 
+                    endDate = new Date(startDate); endDate.setDate(startDate.getDate() + 6); 
+                } else {
+                    startDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+                    endDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+                }
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const dStr = formatDate(d); const dayData = allData[dStr];
+                    if (dayData && dayData.actuals) {
+                        Object.values(dayData.actuals).forEach(item => { if (result[item.cat] !== undefined) result[item.cat] += 0.5; });
+                    }
+                }
+                return result;
+            }, [activeTab, allData, viewDate]);
+
+            useEffect(() => {
+                if (canvasRef.current) {
+                    if (chartInstance.current) chartInstance.current.destroy();
+                    const dataValues = Object.values(stats); const labels = CATEGORIES.map(c => c.name); const colors = CATEGORIES.map(c => c.code);
+                    const filteredData = [], filteredLabels = [], filteredColors = [];
+                    dataValues.forEach((val, i) => { if (val > 0) { filteredData.push(val); filteredLabels.push(labels[i]); filteredColors.push(colors[i]); } });
+                    const ctx = canvasRef.current.getContext('2d');
+                    if (filteredData.length === 0) { ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); return; }
+                    chartInstance.current = new Chart(ctx, { type: 'doughnut', data: { labels: filteredLabels, datasets: [{ data: filteredData, backgroundColor: filteredColors, borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw}h` } } }, cutout: '60%' } });
+                }
+            }, [stats]);
+
+            const totalHours = Object.values(stats).reduce((a, b) => a + b, 0);
+            const exportAnalysisCSV = () => {
+                let csvContent = "\uFEFF集計期間,カテゴリー,合計時間(h),構成比(%)\n";
+                const periodLabel = activeTab === 'week' ? "今週" : `${viewDate.getFullYear()}年${viewDate.getMonth()+1}月`;
+                CATEGORIES.forEach(cat => { const hours = stats[cat.id]; if (hours > 0) { const percent = Math.round((hours / totalHours) * 100); csvContent += `${periodLabel},${cat.name},${hours},${percent}\n`; } });
+                if (totalHours === 0) { alert("集計データがありません"); return; }
+                const link = document.createElement("a"); link.href = encodeURI("data:text/csv;charset=utf-8," + csvContent); link.download = `timewealth_analysis_${activeTab}_${getTodayFullDate()}.csv`; document.body.appendChild(link); link.click();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50">
+                    <div className="bg-white w-full max-w-md md:max-w-lg rounded-t-2xl md:rounded-2xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-gray-700">📊 分析レポート</h3><button onClick={onClose} className="bg-gray-100 w-8 h-8 rounded-full text-gray-500 hover:bg-gray-200">×</button></div>
+                        <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
+                            <button onClick={() => setActiveTab('week')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${activeTab === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}>今週</button>
+                            <button onClick={() => setActiveTab('month')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${activeTab === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}>{viewDate.getMonth()+1}月度</button>
+                        </div>
+                        <div className="relative h-48 w-full flex justify-center items-center mb-6">{totalHours > 0 ? (<><canvas ref={canvasRef}></canvas><div className="absolute text-center"><p className="text-xs text-gray-400">Total</p><p className="text-2xl font-bold">{totalHours}<span className="text-sm">h</span></p></div></>) : (<p className="text-gray-400 text-sm">データなし</p>)}</div>
+                        <div className="space-y-2 overflow-y-auto flex-1 mb-4">
+                            {CATEGORIES.map(cat => {
+                                const hours = stats[cat.id]; if (hours === 0) return null; const percent = Math.round((hours / totalHours) * 100);
+                                return (<div key={cat.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"><div className="flex items-center gap-2"><div className={`w-3 h-3 rounded-full ${cat.color}`}></div><span className="text-sm font-medium">{cat.name}</span></div><div className="text-right"><span className="font-bold mr-2">{hours}h</span><span className="text-xs text-gray-400">({percent}%)</span></div></div>);
+                            })}
+                        </div>
+                        <button onClick={exportAnalysisCSV} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold">CSV出力</button>
+                    </div>
                 </div>
             );
         };
@@ -449,12 +536,23 @@
 
         const DailyScreen = ({ user, currentDate, setCurrentDate, allData, setAllData, onSlotClick, onSaveReflection, isReflectOpen, setIsReflectOpen }) => {
             const chartRef = useRef(null); const canvasRef = useRef(null); const scrollRef = useRef(null);
+            const [currentTimePosition, setCurrentTimePosition] = useState(null);
             const dayData = allData[currentDate] || { actuals: {}, plans: {}, reflection: { am: "", pm: "" } };
             const { actuals, plans, reflection, supervisorComment } = dayData;
             
+            // 現在時刻線の更新 & 削除したスクロール機能を再確認
             useEffect(() => {
-                if (scrollRef.current) { const h = new Date().getHours(); scrollRef.current.scrollTop = (h - 8) * 60; }
-            }, []);
+                const updatePos = () => {
+                    const now = new Date();
+                    if (formatDate(now) !== currentDate) { setCurrentTimePosition(null); return; }
+                    const h = now.getHours(); const m = now.getMinutes();
+                    if(h < 8 || h > 22) { setCurrentTimePosition(null); return; }
+                    setCurrentTimePosition(((h - 8) * 60 + m) * (56 / 30) + 36);
+                };
+                updatePos();
+                const timer = setInterval(updatePos, 60000);
+                return () => clearInterval(timer);
+            }, [currentDate]);
 
             useEffect(() => { if (canvasRef.current) { if (chartRef.current) chartRef.current.destroy(); const counts = {}; CATEGORIES.forEach(c => counts[c.name] = 0); Object.values(actuals || {}).forEach(item => { const cat = CATEGORIES.find(c => c.id === item.cat); if (cat) counts[cat.name] += 30; }); const ctx = canvasRef.current.getContext('2d'); chartRef.current = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts).map(k => k.substring(0,4)), datasets: [{ label: '時間(分)', data: Object.values(counts), backgroundColor: CATEGORIES.map(c => c.code), borderRadius: 4, barThickness: 20 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true, grid: {display: false} }, y: { display: true, beginAtZero: true } } } }); } }, [actuals]);
 
@@ -467,6 +565,7 @@
                     <div className="flex items-center justify-between bg-white p-3 border-b shadow-sm z-30 shrink-0"><button onClick={() => changeDate(-1)} className="p-2"><i className="fas fa-chevron-left"></i></button><h2 className="font-bold text-lg">{getDisplayDate(currentDate)}</h2><button onClick={() => changeDate(1)} className="p-2"><i className="fas fa-chevron-right"></i></button></div>
                     <div className="bg-white p-4 shadow-sm border-b z-10 shrink-0 h-48 md:h-64"><canvas ref={canvasRef}></canvas></div>
                     <div className="flex-1 overflow-y-auto relative bg-[#f8fafc]" ref={scrollRef}>
+                        {currentTimePosition && <div className="current-time-line" style={{ top: `${currentTimePosition}px` }}><div className="current-time-ball"></div></div>}
                         <div className="flex text-xs md:text-sm font-bold text-gray-500 bg-gray-50 py-3 sticky top-0 z-10 border-b"><div className="w-12 md:w-20 text-center">Time</div><div className="flex-1 text-center">Plan</div><div className="flex-1 text-center">Actual</div></div>
                         {TIME_SLOTS.map(time => (
                             <div key={time} className="flex border-b border-gray-200 h-14 bg-white relative hover:bg-gray-50 transition">
@@ -500,13 +599,17 @@
 
         const HistoryScreen = ({ currentDate, setCurrentDate, allData, onSelectDate }) => {
             const [viewDate, setViewDate] = useState(new Date(currentDate));
+            const [showAnalytics, setShowAnalytics] = useState(false);
             const changeMonth = (diff) => { const d = new Date(viewDate); d.setMonth(d.getMonth() + diff); setViewDate(d); };
             const generateCalendar = () => { const year = viewDate.getFullYear(); const month = viewDate.getMonth(); const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const days = []; for (let i = 0; i < firstDay.getDay(); i++) { days.push(null); } for (let i = 1; i <= lastDay.getDate(); i++) { days.push(new Date(year, month, i)); } return days; };
             const calendarDays = generateCalendar();
 
             return (
                 <div className="p-4 pb-24 md:p-8 animate-fade-in max-w-5xl mx-auto w-full">
-                    <div className="flex justify-between items-end mb-4"><h2 className="font-bold text-gray-700 text-xl">履歴</h2></div>
+                    <div className="flex justify-between items-end mb-4">
+                        <h2 className="font-bold text-gray-700 text-xl">履歴</h2>
+                        <button onClick={() => setShowAnalytics(true)} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-indigo-100 transition"><i className="fas fa-chart-pie mr-2"></i>分析</button>
+                    </div>
                     <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
                         <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg">{viewDate.getFullYear()}年 {viewDate.getMonth() + 1}月</h3><div className="flex gap-2 text-gray-500"><button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded"><i className="fas fa-chevron-left"></i></button><button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded"><i className="fas fa-chevron-right"></i></button></div></div>
                         <div className="grid grid-cols-7 gap-2 text-center text-sm mb-2 text-gray-400 font-bold"><div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div></div>
@@ -520,6 +623,7 @@
                             })}
                         </div>
                     </div>
+                    {showAnalytics && <AnalyticsModal onClose={() => setShowAnalytics(false)} allData={allData} viewDate={viewDate} />}
                 </div>
             );
         };
@@ -577,7 +681,7 @@
                         <button onClick={logout} className="text-[10px] md:text-xs bg-white/20 px-3 py-1.5 rounded text-white/90 hover:bg-white/30 transition border border-white/10">ログアウト</button>
                     </div>
 
-                    <div className="flex flex-1 overflow-hidden relative w-full bg-[#f8fafc] flex-col md:flex-row flex">
+                    <div className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] md:flex-row flex-col">
                         <div className="hidden md:flex w-64 bg-white border-r flex-col shrink-0 z-30 p-4 gap-2">
                             <button onClick={() => setView('home')} className={`p-3 text-left font-bold rounded transition ${view==='home' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-home mr-2"></i>ホーム</button>
                             <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`p-3 text-left font-bold rounded transition ${view==='daily' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-calendar-day mr-2"></i>行動記録</button>
@@ -587,8 +691,8 @@
                             {isMaster && <button onClick={() => setView('admin')} className={`p-3 text-left font-bold rounded transition ${view==='admin' ? 'text-gray-800 bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-cog mr-2"></i>アカウント管理</button>}
                         </div>
 
-                        {/* ★修正ポイント: "flex flex-col justify-start" で上詰め配置を強制 */}
-                        <div className="flex-1 overflow-y-auto w-full h-full bg-[#f8fafc] flex flex-col justify-start">
+                        {/* ★修正ポイント: "block" と "p-0" で強制的に上詰め配置 */}
+                        <div className="flex-1 overflow-y-auto w-full h-full bg-[#f8fafc] block p-0 relative">
                             {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
                             {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
                             {view === 'history' && <HistoryScreen currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} onSelectDate={handleSelectDate} />}
