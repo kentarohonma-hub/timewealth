@@ -32,7 +32,7 @@
         .badge-standard { background-color: #94a3b8; }
 
         /* 3段階スイッチ */
-        .role-switch { display: inline-flex; background: #f1f5f9; border-radius: 6px; padding: 2px; border: 1px solid #cbd5e1; }
+        .role-switch { display: inline-flex; background: #e2e8f0; border-radius: 6px; padding: 2px; border: 1px solid #cbd5e1; }
         .role-btn { 
             padding: 4px 8px; 
             font-size: 10px; 
@@ -40,14 +40,16 @@
             border-radius: 4px; 
             cursor: pointer; 
             color: #64748b; 
-            transition: all 0.1s;
+            transition: all 0.2s;
             margin: 0 1px;
         }
-        .role-btn:hover { background: #e2e8f0; }
+        .role-btn:hover { background: #cbd5e1; }
         .role-btn.active { background: white; color: #0f172a; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .role-btn.active-master { color: #ef4444; border-bottom: 2px solid #ef4444; }
-        .role-btn.active-premium { color: #f59e0b; border-bottom: 2px solid #f59e0b; }
-        .role-btn.active-standard { color: #64748b; border-bottom: 2px solid #94a3b8; }
+        
+        /* 選択時の色強調 */
+        .role-btn.active.role-master { color: #ef4444; border-bottom: 2px solid #ef4444; }
+        .role-btn.active.role-premium { color: #f59e0b; border-bottom: 2px solid #f59e0b; }
+        .role-btn.active.role-standard { color: #64748b; border-bottom: 2px solid #94a3b8; }
     </style>
 </head>
 <body>
@@ -212,7 +214,7 @@
             return <span className={`badge ${styles[safeRole]}`}>{labels[safeRole]}</span>;
         };
 
-        // ★3段階トグルスイッチ (機能強化版)
+        // ★3段階トグルスイッチ
         const RoleSwitch = ({ currentRole, onChange }) => {
             const roles = [
                 { id: 'standard', label: 'Std' },
@@ -226,7 +228,7 @@
                         <div 
                             key={r.id}
                             onClick={() => onChange(r.id)}
-                            className={`role-btn ${safeCurrent === r.id ? 'active active-' + r.id : ''}`}
+                            className={`role-btn ${safeCurrent === r.id ? 'active role-' + r.id : ''}`}
                         >
                             {r.label}
                         </div>
@@ -303,7 +305,6 @@
             );
         };
 
-        // アカウント管理画面 (3段階スイッチ対応)
         const AdminScreen = ({ searchUsers, updateUserRole, currentUserUid }) => {
             const [users, setUsers] = useState([]);
             useEffect(() => { searchUsers("").then(setUsers); }, []);
@@ -321,7 +322,7 @@
                     <h2 className="font-bold text-xl mb-4 text-gray-700">アカウント管理</h2>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden text-sm">
                         <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">現在の権限</th><th className="p-3 text-center">権限変更</th></tr></thead>
+                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">権限</th><th className="p-3 text-center">操作</th></tr></thead>
                             <tbody className="divide-y">
                                 {users.map(u => (
                                     <tr key={u.uid}>
@@ -403,8 +404,6 @@
                 </div>
             );
         };
-
-        // ... (HomeScreen, DailyScreen, HistoryScreen, AnalyticsModal は前回のコードと同じですが、表示位置修正のため再掲します) ...
 
         const HomeScreen = ({ user, todayStr, allData, onViewChange }) => {
             const totalLogs = useMemo(() => {
@@ -578,7 +577,7 @@
                         <button onClick={logout} className="text-[10px] md:text-xs bg-white/20 px-3 py-1.5 rounded text-white/90 hover:bg-white/30 transition border border-white/10">ログアウト</button>
                     </div>
 
-                    <div className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] md:flex-row flex-col">
+                    <div className="flex flex-1 overflow-hidden relative w-full bg-[#f8fafc] flex-col md:flex-row flex">
                         <div className="hidden md:flex w-64 bg-white border-r flex-col shrink-0 z-30 p-4 gap-2">
                             <button onClick={() => setView('home')} className={`p-3 text-left font-bold rounded transition ${view==='home' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-home mr-2"></i>ホーム</button>
                             <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`p-3 text-left font-bold rounded transition ${view==='daily' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-calendar-day mr-2"></i>行動記録</button>
@@ -588,8 +587,8 @@
                             {isMaster && <button onClick={() => setView('admin')} className={`p-3 text-left font-bold rounded transition ${view==='admin' ? 'text-gray-800 bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-cog mr-2"></i>アカウント管理</button>}
                         </div>
 
-                        {/* ★修正ポイント: 強制的に上詰め(block)に変更し、flexの悪影響を排除 */}
-                        <div className="flex-1 overflow-y-auto w-full h-full bg-[#f8fafc] block p-0">
+                        {/* ★修正ポイント: "flex flex-col justify-start" で上詰め配置を強制 */}
+                        <div className="flex-1 overflow-y-auto w-full h-full bg-[#f8fafc] flex flex-col justify-start">
                             {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
                             {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
                             {view === 'history' && <HistoryScreen currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} onSelectDate={handleSelectDate} />}
