@@ -3,17 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TimeWellth V42</title>
+    <title>TimeWellth V43</title>
     
-    <div id="debug-console" style="display:none; position:fixed; top:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#ff5555; padding:10px; z-index:9999; font-size:12px; max-height:200px; overflow:auto;"></div>
-    <script>
-        window.onerror = function(msg, url, line) {
-            var el = document.getElementById('debug-console');
-            el.style.display = 'block';
-            el.innerHTML += "<div>[Error] " + msg + " (Line:" + line + ")</div>";
-        };
-    </script>
-
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -34,20 +25,29 @@
         .brand-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
         button { touch-action: manipulation; }
         
-        /* バッジスタイル */
-        .badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; color: white; font-weight: bold; letter-spacing: 0.05em; }
+        /* バッジ */
+        .badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; color: white; font-weight: bold; letter-spacing: 0.05em; display: inline-block; }
         .badge-master { background-color: #ef4444; }
         .badge-premium { background-color: #f59e0b; }
         .badge-standard { background-color: #94a3b8; }
 
-        /* スイッチスタイル */
-        .toggle-checkbox:checked {
-            right: 0;
-            border-color: #3b82f6;
+        /* 3段階トグルスイッチ */
+        .role-toggler { display: inline-flex; background: #f1f5f9; border-radius: 8px; padding: 3px; border: 1px solid #e2e8f0; }
+        .role-option { 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            font-size: 10px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: all 0.2s;
+            color: #64748b;
+            margin: 0 1px;
         }
-        .toggle-checkbox:checked + .toggle-label {
-            background-color: #3b82f6;
-        }
+        .role-option:hover { background: #e2e8f0; }
+        .role-option.active { color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .role-option.active-standard { background-color: #94a3b8; }
+        .role-option.active-premium { background-color: #f59e0b; }
+        .role-option.active-master { background-color: #ef4444; }
     </style>
 </head>
 <body>
@@ -127,6 +127,7 @@
                         db.collection("users").doc(u.uid).onSnapshot(doc => {
                             if (doc.exists) {
                                 const d = doc.data();
+                                // Master強制付与
                                 if (u.email === MASTER_EMAIL && d.role !== 'master') {
                                     db.collection("users").doc(u.uid).update({ role: 'master' });
                                 }
@@ -212,18 +213,22 @@
             return <span className={`badge ${styles[safeRole]}`}>{labels[safeRole]}</span>;
         };
 
-        // トグルスイッチコンポーネント
-        const RoleSwitch = ({ role, onChange }) => {
-            const isPremium = role === 'premium';
+        // ★新機能: 3段階トグルスイッチコンポーネント
+        const Role3WaySwitch = ({ currentRole, onSelect }) => {
+            const roles = ['standard', 'premium', 'master'];
+            const labels = { standard: 'Standard', premium: 'Premium', master: 'Master' };
+            
             return (
-                <div className="flex items-center justify-center cursor-pointer" onClick={onChange}>
-                    <div className="relative">
-                        <div className={`block w-10 h-6 rounded-full transition ${isPremium ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform ${isPremium ? 'translate-x-4' : ''}`}></div>
-                    </div>
-                    <div className="ml-2 text-xs font-bold text-gray-500">
-                        {isPremium ? 'Premium' : 'Standard'}
-                    </div>
+                <div className="role-toggler">
+                    {roles.map(r => (
+                        <div 
+                            key={r}
+                            onClick={() => onSelect(r)}
+                            className={`role-option ${currentRole === r ? 'active active-' + r : ''}`}
+                        >
+                            {labels[r]}
+                        </div>
+                    ))}
                 </div>
             );
         };
@@ -296,13 +301,12 @@
             );
         };
 
-        const AdminScreen = ({ searchUsers, updateUserRole }) => {
+        const AdminScreen = ({ searchUsers, updateUserRole, currentUserUid }) => {
             const [users, setUsers] = useState([]);
             useEffect(() => { searchUsers("").then(setUsers); }, []);
             
-            const handleToggleRole = async (uid, currentRole, name) => {
-                if (currentRole === 'master') return;
-                const newRole = currentRole === 'premium' ? 'standard' : 'premium';
+            const handleRoleChange = async (uid, newRole, name) => {
+                if (uid === currentUserUid) { alert("自分自身の権限は変更できません"); return; }
                 if (confirm(`${name}さんの権限を【${newRole.toUpperCase()}】に変更しますか？`)) {
                     await updateUserRole(uid, newRole);
                     setUsers(users.map(u => u.uid === uid ? { ...u, role: newRole } : u));
@@ -314,15 +318,20 @@
                     <h2 className="font-bold text-xl mb-4 text-gray-700">アカウント管理</h2>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden text-sm">
                         <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">権限</th><th className="p-3 text-center">操作</th></tr></thead>
+                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">現在の権限</th><th className="p-3 text-center">権限変更</th></tr></thead>
                             <tbody className="divide-y">
                                 {users.map(u => (
                                     <tr key={u.uid}>
                                         <td className="p-3">{u.name}<div className="text-xs text-gray-400">{u.email}</div></td>
                                         <td className="p-3"><RoleBadge role={u.role} /></td>
                                         <td className="p-3 text-center">
-                                            {u.role !== 'master' && (
-                                                <RoleSwitch role={u.role} onChange={() => handleToggleRole(u.uid, u.role, u.name)} />
+                                            {u.uid !== currentUserUid ? (
+                                                <Role3WaySwitch 
+                                                    currentRole={u.role || 'standard'} 
+                                                    onSelect={(r) => handleRoleChange(u.uid, r, u.name)} 
+                                                />
+                                            ) : (
+                                                <span className="text-xs text-gray-300">操作不可</span>
                                             )}
                                         </td>
                                     </tr>
@@ -334,7 +343,6 @@
             );
         };
 
-        // MultiViewScreen (UI改善: 幅調整対応)
         const MultiViewScreen = ({ targetUids, fetchMemberData, saveData }) => {
             const [membersData, setMembersData] = useState([]);
             const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
@@ -361,7 +369,6 @@
                         <button onClick={() => changeDate(1)} className="p-2"><i className="fas fa-chevron-right"></i></button>
                     </div>
                     <div className="flex-1 overflow-x-auto bg-[#f8fafc]">
-                        {/* 修正ポイント: widthを自動計算にして1人のときは全幅を使う */}
                         <div className="flex h-full" style={{ minWidth: membersData.length > 1 ? membersData.length * 320 + 'px' : '100%' }}>
                             {membersData.map(member => {
                                 const dayLog = member.logs[currentDate] || {};
@@ -393,9 +400,6 @@
                 </div>
             );
         };
-
-        // --- 以下、既存コンポーネント (DailyScreen, HomeScreen, etc.) はV41と同じ ---
-        // (コード量の都合上、上記修正点を反映しつつ全体を構築します)
 
         const DailyScreen = ({ user, currentDate, setCurrentDate, allData, setAllData, onSlotClick, onSaveReflection, isReflectOpen, setIsReflectOpen }) => {
             const chartRef = useRef(null); const canvasRef = useRef(null); const scrollRef = useRef(null);
@@ -516,7 +520,6 @@
             );
         };
 
-        // App Main
         const App = () => {
             const { user, userData, allData, loading, saveData, searchUsers, addTeamMember, removeTeamMember, fetchMemberData, updateUserRole, loginGoogle, logout } = useFirebaseData();
             const [view, setView] = useState('home');
@@ -529,7 +532,7 @@
             const [inputText, setInputText] = useState("");
             const [isReflectOpen, setIsReflectOpen] = useState(false);
 
-            if (loading) return <div id="loader"><div className="text-xl font-bold text-gray-600 mb-2">TimeWellth</div><div className="text-sm text-gray-400">Loading...</div></div>;
+            if (loading) return <div id="loader">Loading...</div>;
             if (!user) return <LoginScreen onLogin={loginGoogle} />;
             if (!userData) return <div className="h-screen flex items-center justify-center">Account Setup...</div>;
 
@@ -580,12 +583,13 @@
                             {isMaster && <button onClick={() => setView('admin')} className={`p-3 text-left font-bold rounded transition ${view==='admin' ? 'text-gray-800 bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-cog mr-2"></i>アカウント管理</button>}
                         </div>
 
-                        <div className="flex-1 overflow-y-auto w-full h-full">
+                        {/* ★修正: 垂直方向の強制位置調整 (justify-start) を追加 */}
+                        <div className="flex-1 overflow-y-auto w-full h-full flex flex-col justify-start">
                             {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
                             {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
                             {view === 'history' && <HistoryScreen currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} onSelectDate={handleSelectDate} />}
                             {view === 'team' && <TeamScreen user={user} userData={userData} searchUsers={searchUsers} addTeamMember={addTeamMember} removeTeamMember={removeTeamMember} onViewMembers={handleViewTeam} />}
-                            {view === 'admin' && <AdminScreen searchUsers={searchUsers} updateUserRole={updateUserRole} />}
+                            {view === 'admin' && <AdminScreen searchUsers={searchUsers} updateUserRole={updateUserRole} currentUserUid={user.uid} />}
                             {view === 'multiview' && <MultiViewScreen targetUids={viewMembers} fetchMemberData={fetchMemberData} saveData={saveData} />}
                         </div>
                     </div>
