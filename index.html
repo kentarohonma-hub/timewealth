@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TimeWellth V40</title>
+    <title>TimeWellth V41</title>
     
     <div id="debug-console" style="display:none; position:fixed; top:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#ff5555; padding:10px; z-index:9999; font-size:12px; max-height:200px; overflow:auto;"></div>
     <script>
@@ -33,7 +33,6 @@
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .brand-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
         button { touch-action: manipulation; }
-        /* 権限バッジ */
         .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold; margin-left: 5px; }
         .badge-master { background-color: #ef4444; }
         .badge-premium { background-color: #f59e0b; }
@@ -107,7 +106,7 @@
             return { id: 'beginner', name: 'Beginner', color: 'bg-gradient-to-r from-green-200 to-green-400', text: 'text-green-700', icon: '🔰', next: 'Bronze', target: 30 };
         };
 
-        // 3. Hooks (V39の管理機能を維持)
+        // 3. Hooks
         const useFirebaseData = () => {
             const [user, setUser] = useState(null);
             const [userData, setUserData] = useState(null);
@@ -118,7 +117,6 @@
                 const unsubAuth = auth.onAuthStateChanged(async (u) => {
                     if (u) {
                         setUser(u);
-                        // User Data
                         db.collection("users").doc(u.uid).onSnapshot(doc => {
                             if (doc.exists) {
                                 const d = doc.data();
@@ -133,7 +131,6 @@
                                 }, { merge: true });
                             }
                         });
-                        // Log Data
                         db.collection("users").doc(u.uid).collection("data").doc("logs").onSnapshot(doc => {
                             setAllData(doc.exists ? (doc.data().data || {}) : {});
                         });
@@ -185,7 +182,7 @@
             return { user, userData, allData, loading, saveData, searchUsers, addTeamMember, removeTeamMember, fetchMemberData, updateUserRole, loginGoogle, logout };
         };
 
-        // 4. Components (V38 UI Base)
+        // 4. Components
 
         const LoginScreen = ({ onLogin }) => (
             <div className="min-h-screen brand-gradient flex flex-col items-center justify-center p-6 text-white animate-fade-in">
@@ -199,17 +196,14 @@
             </div>
         );
 
-        // V38 Style SetupScreen (Logic for display name setup if needed, mostly handled by Google Login now)
         const SetupScreen = () => <div className="h-screen flex items-center justify-center">Setting up...</div>;
 
-        // V38 Style Role Badge
         const RoleBadge = ({ role }) => {
             const labels = { master: "MASTER", premium: "PREMIUM", standard: "STANDARD" };
             const styles = { master: "badge-master", premium: "badge-premium", standard: "badge-standard" };
             return <span className={`badge ${styles[role]}`}>{labels[role]}</span>;
         };
 
-        // チーム管理画面 (UIはV38風にシンプル化)
         const TeamScreen = ({ user, userData, searchUsers, addTeamMember, removeTeamMember, onViewMembers }) => {
             const [searchTerm, setSearchTerm] = useState("");
             const [searchResults, setSearchResults] = useState([]);
@@ -278,7 +272,6 @@
             );
         };
 
-        // アカウント管理画面 (UIはV38風)
         const AdminScreen = ({ searchUsers, updateUserRole }) => {
             const [users, setUsers] = useState([]);
             useEffect(() => { searchUsers("").then(setUsers); }, []);
@@ -311,7 +304,6 @@
             );
         };
 
-        // マルチビュー画面 (V38 DailyScreenのデザインを横並びにする)
         const MultiViewScreen = ({ targetUids, fetchMemberData, saveData }) => {
             const [membersData, setMembersData] = useState([]);
             const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
@@ -371,7 +363,6 @@
             );
         };
 
-        // --- V38のデザインを完全再現したDailyScreen ---
         const DailyScreen = ({ user, currentDate, setCurrentDate, allData, setAllData, onSlotClick, onSaveReflection, isReflectOpen, setIsReflectOpen }) => {
             const chartRef = useRef(null); const canvasRef = useRef(null); const scrollRef = useRef(null);
             const dayData = allData[currentDate] || { actuals: {}, plans: {}, reflection: { am: "", pm: "" } };
@@ -400,7 +391,6 @@
                                 <div className="flex-1 p-1 cursor-pointer relative group" onClick={() => onSlotClick(time, 'actual')}>{actuals?.[time] ? <div className={`h-full rounded px-2 py-1 text-[10px] md:text-xs text-white leading-tight flex items-center ${CATEGORIES.find(c=>c.id===actuals[time].cat)?.color}`}>{actuals[time].text}</div> : <div className="h-full flex items-center justify-center text-gray-100 text-lg group-hover:text-gray-300 transition">+</div>}</div>
                             </div>
                         ))}
-                        {/* 上司コメント表示 (V39機能) */}
                         {supervisorComment && <div className="m-4 p-4 bg-green-50 border border-green-200 rounded-xl"><div className="font-bold text-green-700 text-sm mb-1"><i className="fas fa-comment-dots"></i> 上司コメント</div><p className="text-sm text-gray-800">{supervisorComment}</p></div>}
                         <div className="h-24"></div>
                     </div>
@@ -424,7 +414,6 @@
             );
         };
 
-        // HomeScreen (V38デザイン + 管理ボタン追加)
         const HomeScreen = ({ user, todayStr, allData, onViewChange }) => {
             const totalLogs = useMemo(() => {
                 if (!allData) return 0;
@@ -446,12 +435,10 @@
                             </div>
                         </div>
                     </div>
-                    {/* メインメニュー (V38風のグリッド配置) */}
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100"><p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wide">Streak</p><p className="text-2xl font-bold text-slate-700">1 <span className="text-xs text-slate-400">days</span></p></div>
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100"><p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wide">Logs</p><p className="text-2xl font-bold text-slate-700">{totalLogs} <span className="text-xs text-slate-400">days</span></p></div>
                         
-                        {/* 管理メニュー (権限がある場合のみ表示、デザインは統一) */}
                         {isPremium && (
                             <div onClick={() => onViewChange('team')} className="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100 cursor-pointer col-span-2 flex items-center justify-between hover:bg-green-100 transition">
                                 <div><p className="text-xs text-green-600 font-bold mb-1 uppercase">Management</p><p className="text-lg font-bold text-green-800">チームの行動記録</p></div>
@@ -469,7 +456,6 @@
             );
         };
 
-        // History Screen (V38 Design)
         const HistoryScreen = ({ currentDate, onSelectDate, allData }) => {
             const [viewDate, setViewDate] = useState(new Date(currentDate));
             const changeMonth = (diff) => { const d = new Date(viewDate); d.setMonth(d.getMonth() + diff); setViewDate(d); };
@@ -496,44 +482,39 @@
             );
         };
 
-        // App Main
         const App = () => {
             const { user, userData, allData, loading, saveData, searchUsers, addTeamMember, removeTeamMember, fetchMemberData, updateUserRole, loginGoogle, logout } = useFirebaseData();
             const [view, setView] = useState('home');
             const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
             const [viewMembers, setViewMembers] = useState([]);
 
-            // Modal States
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [selectedTime, setSelectedTime] = useState(null);
             const [inputType, setInputType] = useState(null);
             const [inputText, setInputText] = useState("");
             const [isReflectOpen, setIsReflectOpen] = useState(false);
 
-            if (loading) return <div id="loader"><div className="text-xl font-bold text-gray-600 mb-2">TimeWellth</div><div className="text-sm text-gray-400">Loading...</div></div>;
+            if (loading) return <div id="loader">Loading...</div>;
             if (!user) return <LoginScreen onLogin={loginGoogle} />;
             if (!userData) return <div className="h-screen flex items-center justify-center">Account Setup...</div>;
 
-            // Handlers
+            const isPremium = userData.role === 'master' || userData.role === 'premium';
+            const isMaster = userData.role === 'master';
+
             const handleSave = (catId) => {
                 const text = inputText.trim() === "" ? CATEGORIES.find(c => c.id === catId).name : inputText;
                 const data = { text, cat: catId };
                 const dayData = allData[currentDate] || { plans: {}, actuals: {}, reflection: {} };
-                if (inputType === 'plan') {
-                    dayData.plans = { ...dayData.plans, [selectedTime]: data };
-                } else {
-                    dayData.actuals = { ...dayData.actuals, [selectedTime]: data };
-                }
+                if (inputType === 'plan') dayData.plans = { ...dayData.plans, [selectedTime]: data };
+                else dayData.actuals = { ...dayData.actuals, [selectedTime]: data };
                 saveData({ ...allData, [currentDate]: dayData });
                 setIsModalOpen(false); setInputText("");
             };
-
             const handleReflection = (am, pm) => {
                 const dayData = allData[currentDate] || { plans: {}, actuals: {}, reflection: {} };
                 saveData({ ...allData, [currentDate]: { ...dayData, reflection: { am, pm } } });
                 setIsReflectOpen(false);
             };
-
             const handleSlotClick = (time, type) => {
                 setSelectedTime(time); setInputType(type);
                 const dayData = allData[currentDate] || { plans: {}, actuals: {} };
@@ -541,47 +522,68 @@
                 setInputText(cur ? cur.text : "");
                 setIsModalOpen(true);
             };
-
             const handleSelectDate = (dateStr) => { setCurrentDate(dateStr); setView('daily'); };
             const handleViewTeam = (uids) => { setViewMembers(uids); setView('multiview'); };
 
             return (
                 <div className="flex flex-col h-screen overflow-hidden">
                     <div className={`text-white p-4 flex justify-between items-center shrink-0 z-40 shadow-md brand-gradient`}>
-                        <div className="flex items-center gap-2"><h1 className="font-bold text-lg">TimeWellth</h1><RoleBadge role={userData.role} /></div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="font-bold text-lg">TimeWellth</h1>
+                            <RoleBadge role={userData.role} />
+                        </div>
                         <button onClick={logout} className="text-[10px] md:text-xs bg-white/20 px-3 py-1.5 rounded text-white/90 hover:bg-white/30 transition border border-white/10">ログアウト</button>
                     </div>
 
-                    <div className="flex-1 overflow-hidden relative w-full bg-[#f8fafc]">
-                        {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
-                        {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
-                        {view === 'history' && <HistoryScreen currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} onSelectDate={handleSelectDate} />}
-                        {view === 'team' && <TeamScreen user={user} userData={userData} searchUsers={searchUsers} addTeamMember={addTeamMember} removeTeamMember={removeTeamMember} onViewMembers={handleViewTeam} />}
-                        {view === 'admin' && <AdminScreen searchUsers={searchUsers} updateUserRole={updateUserRole} />}
-                        {view === 'multiview' && <MultiViewScreen targetUids={viewMembers} fetchMemberData={fetchMemberData} saveData={saveData} />}
+                    <div className="flex flex-1 overflow-hidden relative w-full bg-[#f8fafc] md:flex-row flex-col">
+                        
+                        {/* ★復活させたサイドバー (PC用) */}
+                        <div className="hidden md:flex w-64 bg-white border-r flex-col shrink-0 z-30 p-4 gap-2">
+                            <button onClick={() => setView('home')} className={`p-3 text-left font-bold rounded transition ${view==='home' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-home mr-2"></i>ホーム</button>
+                            <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`p-3 text-left font-bold rounded transition ${view==='daily' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-calendar-day mr-2"></i>行動記録</button>
+                            <button onClick={() => setView('history')} className={`p-3 text-left font-bold rounded transition ${view==='history' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-history mr-2"></i>履歴</button>
+                            {isPremium && <div className="border-t my-2"></div>}
+                            {isPremium && <button onClick={() => setView('team')} className={`p-3 text-left font-bold rounded transition ${view==='team' ? 'text-green-600 bg-green-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-users mr-2"></i>チーム管理</button>}
+                            {isMaster && <button onClick={() => setView('admin')} className={`p-3 text-left font-bold rounded transition ${view==='admin' ? 'text-gray-800 bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-cog mr-2"></i>アカウント管理</button>}
+                        </div>
+
+                        {/* メインコンテンツ */}
+                        <div className="flex-1 overflow-y-auto w-full h-full">
+                            {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
+                            {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
+                            {view === 'history' && <HistoryScreen currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} onSelectDate={handleSelectDate} />}
+                            {view === 'team' && <TeamScreen user={user} userData={userData} searchUsers={searchUsers} addTeamMember={addTeamMember} removeTeamMember={removeTeamMember} onViewMembers={handleViewTeam} />}
+                            {view === 'admin' && <AdminScreen searchUsers={searchUsers} updateUserRole={updateUserRole} />}
+                            {view === 'multiview' && <MultiViewScreen targetUids={viewMembers} fetchMemberData={fetchMemberData} saveData={saveData} />}
+                        </div>
                     </div>
 
-                    {/* V38 Footer (Home, Daily, History only visible on standard views) */}
-                    {(view === 'home' || view === 'daily' || view === 'history') && (
-                        <div className="md:hidden shrink-0 bg-white border-t border-gray-200 flex justify-around py-2 pb-safe z-40">
-                            <button onClick={() => setView('home')} className={`flex flex-col items-center p-2 flex-1 ${view === 'home' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">ホーム</span></button>
-                            <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`flex flex-col items-center p-2 flex-1 ${view === 'daily' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-calendar-day text-xl mb-1"></i><span className="text-[10px] font-bold">行動記録</span></button>
-                            <button onClick={() => setView('history')} className={`flex flex-col items-center p-2 flex-1 ${view === 'history' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-history text-xl mb-1"></i><span className="text-[10px] font-bold">履歴</span></button>
-                        </div>
-                    )}
-                    {/* Management view Footer (Back button) */}
-                    {(view === 'team' || view === 'admin' || view === 'multiview') && (
-                        <div className="md:hidden shrink-0 bg-white border-t border-gray-200 flex justify-around py-2 pb-safe z-40">
-                            <button onClick={() => setView('home')} className="flex flex-col items-center p-2 flex-1 text-gray-500"><i className="fas fa-arrow-left text-xl mb-1"></i><span className="text-[10px] font-bold">戻る</span></button>
-                        </div>
-                    )}
+                    {/* モバイル用フッター (V38同様) */}
+                    <div className="md:hidden shrink-0 bg-white border-t border-gray-200 flex justify-around py-2 pb-safe z-40">
+                        <button onClick={() => setView('home')} className={`flex flex-col items-center p-2 flex-1 ${view === 'home' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">ホーム</span></button>
+                        <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`flex flex-col items-center p-2 flex-1 ${view === 'daily' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-calendar-day text-xl mb-1"></i><span className="text-[10px] font-bold">行動記録</span></button>
+                        <button onClick={() => setView('history')} className={`flex flex-col items-center p-2 flex-1 ${view === 'history' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-history text-xl mb-1"></i><span className="text-[10px] font-bold">履歴</span></button>
+                    </div>
 
+                    {/* モーダル群 (入力、日報) */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50">
                             <div className="bg-white w-full max-w-md md:max-w-lg rounded-t-2xl md:rounded-2xl p-5 animate-slide-up shadow-2xl">
                                 <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-700">{selectedTime} の{inputType === 'plan' ? '予定' : '実績'}</h3><button onClick={() => setIsModalOpen(false)} className="bg-gray-100 w-8 h-8 rounded-full text-gray-500 hover:bg-gray-200">×</button></div>
                                 <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-lg mb-4 outline-none focus:ring-2 focus:ring-blue-500" placeholder="内容を入力..." autoFocus />
                                 <div className="grid grid-cols-3 gap-2">{CATEGORIES.map(cat => <button key={cat.id} onClick={() => handleSave(cat.id)} className={`${cat.color} text-white py-3 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition flex flex-col items-center justify-center hover:opacity-90`}>{cat.name}</button>)}</div>
+                            </div>
+                        </div>
+                    )}
+                    {isReflectOpen && (
+                        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
+                            <div className="bg-white w-full max-w-md rounded-t-2xl p-5">
+                                <h3 className="font-bold mb-4">日報</h3>
+                                <div className="space-y-4">
+                                    <div><label className="text-xs font-bold text-blue-600">AM</label><textarea id="am-in" className="w-full border p-2" rows="2" defaultValue={allData[currentDate]?.reflection?.am}></textarea></div>
+                                    <div><label className="text-xs font-bold text-indigo-600">PM</label><textarea id="pm-in" className="w-full border p-2" rows="3" defaultValue={allData[currentDate]?.reflection?.pm}></textarea></div>
+                                    <button onClick={()=>{handleReflection(document.getElementById('am-in').value, document.getElementById('pm-in').value)}} className="w-full bg-slate-800 text-white py-3 rounded font-bold">保存</button>
+                                </div>
                             </div>
                         </div>
                     )}
