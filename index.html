@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TimeWellth V47 (Fixed)</title>
+    <title>TimeWellth V48 (Fixed)</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -690,7 +690,7 @@
                             {isMaster && <button onClick={() => setView('admin')} className={`p-3 text-left font-bold rounded transition ${view==='admin' ? 'text-gray-800 bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-cog mr-2"></i>アカウント管理</button>}
                         </div>
 
-                        {/* ★修正ポイント: "block" から "flex flex-col justify-start" に変更して上詰めを強制 */}
+                        {/* ★修正ポイント: "block" を "flex flex-col justify-start" に変更して強制上詰め */}
                         <div className="flex-1 overflow-y-auto w-full h-full bg-[#f8fafc] flex flex-col justify-start p-0 relative">
                             {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
                             {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
