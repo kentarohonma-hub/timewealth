@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TimeWellth V41</title>
+    <title>TimeWellth V42</title>
     
     <div id="debug-console" style="display:none; position:fixed; top:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#ff5555; padding:10px; z-index:9999; font-size:12px; max-height:200px; overflow:auto;"></div>
     <script>
@@ -33,10 +33,21 @@
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .brand-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
         button { touch-action: manipulation; }
-        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold; margin-left: 5px; }
+        
+        /* バッジスタイル */
+        .badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; color: white; font-weight: bold; letter-spacing: 0.05em; }
         .badge-master { background-color: #ef4444; }
         .badge-premium { background-color: #f59e0b; }
         .badge-standard { background-color: #94a3b8; }
+
+        /* スイッチスタイル */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #3b82f6;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3b82f6;
+        }
     </style>
 </head>
 <body>
@@ -93,10 +104,6 @@
             const d = new Date(dateStr);
             const days = ['日','月','火','水','木','金','土'];
             return `${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
-        };
-        const getTodayFullDate = () => {
-            const d = new Date();
-            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
         };
 
         const getRankInfo = (totalDays) => {
@@ -201,7 +208,24 @@
         const RoleBadge = ({ role }) => {
             const labels = { master: "MASTER", premium: "PREMIUM", standard: "STANDARD" };
             const styles = { master: "badge-master", premium: "badge-premium", standard: "badge-standard" };
-            return <span className={`badge ${styles[role]}`}>{labels[role]}</span>;
+            const safeRole = role && labels[role] ? role : 'standard';
+            return <span className={`badge ${styles[safeRole]}`}>{labels[safeRole]}</span>;
+        };
+
+        // トグルスイッチコンポーネント
+        const RoleSwitch = ({ role, onChange }) => {
+            const isPremium = role === 'premium';
+            return (
+                <div className="flex items-center justify-center cursor-pointer" onClick={onChange}>
+                    <div className="relative">
+                        <div className={`block w-10 h-6 rounded-full transition ${isPremium ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform ${isPremium ? 'translate-x-4' : ''}`}></div>
+                    </div>
+                    <div className="ml-2 text-xs font-bold text-gray-500">
+                        {isPremium ? 'Premium' : 'Standard'}
+                    </div>
+                </div>
+            );
         };
 
         const TeamScreen = ({ user, userData, searchUsers, addTeamMember, removeTeamMember, onViewMembers }) => {
@@ -275,26 +299,32 @@
         const AdminScreen = ({ searchUsers, updateUserRole }) => {
             const [users, setUsers] = useState([]);
             useEffect(() => { searchUsers("").then(setUsers); }, []);
-            const changeRole = async (uid, currentRole) => {
+            
+            const handleToggleRole = async (uid, currentRole, name) => {
                 if (currentRole === 'master') return;
-                const newRole = currentRole === 'standard' ? 'premium' : 'standard';
-                if (confirm(`${newRole}権限に変更しますか？`)) {
+                const newRole = currentRole === 'premium' ? 'standard' : 'premium';
+                if (confirm(`${name}さんの権限を【${newRole.toUpperCase()}】に変更しますか？`)) {
                     await updateUserRole(uid, newRole);
                     setUsers(users.map(u => u.uid === uid ? { ...u, role: newRole } : u));
                 }
             };
+
             return (
                 <div className="p-4 pb-24 max-w-5xl mx-auto w-full">
                     <h2 className="font-bold text-xl mb-4 text-gray-700">アカウント管理</h2>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden text-sm">
                         <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">権限</th><th className="p-3">操作</th></tr></thead>
+                            <thead className="bg-gray-50 text-gray-600"><tr><th className="p-3">名前</th><th className="p-3">権限</th><th className="p-3 text-center">操作</th></tr></thead>
                             <tbody className="divide-y">
                                 {users.map(u => (
                                     <tr key={u.uid}>
-                                        <td className="p-3">{u.name}</td>
+                                        <td className="p-3">{u.name}<div className="text-xs text-gray-400">{u.email}</div></td>
                                         <td className="p-3"><RoleBadge role={u.role} /></td>
-                                        <td className="p-3">{u.role !== 'master' && <button onClick={() => changeRole(u.uid, u.role)} className="text-blue-600 underline">変更</button>}</td>
+                                        <td className="p-3 text-center">
+                                            {u.role !== 'master' && (
+                                                <RoleSwitch role={u.role} onChange={() => handleToggleRole(u.uid, u.role, u.name)} />
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -304,6 +334,7 @@
             );
         };
 
+        // MultiViewScreen (UI改善: 幅調整対応)
         const MultiViewScreen = ({ targetUids, fetchMemberData, saveData }) => {
             const [membersData, setMembersData] = useState([]);
             const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
@@ -330,29 +361,29 @@
                         <button onClick={() => changeDate(1)} className="p-2"><i className="fas fa-chevron-right"></i></button>
                     </div>
                     <div className="flex-1 overflow-x-auto bg-[#f8fafc]">
-                        <div className="flex h-full" style={{ minWidth: membersData.length * 300 + 'px' }}>
+                        {/* 修正ポイント: widthを自動計算にして1人のときは全幅を使う */}
+                        <div className="flex h-full" style={{ minWidth: membersData.length > 1 ? membersData.length * 320 + 'px' : '100%' }}>
                             {membersData.map(member => {
                                 const dayLog = member.logs[currentDate] || {};
                                 return (
-                                    <div key={member.uid} className="w-80 border-r flex flex-col h-full bg-white shrink-0">
+                                    <div key={member.uid} className={`${membersData.length === 1 ? 'flex-1' : 'w-80'} border-r flex flex-col h-full bg-white shrink-0`}>
                                         <div className="p-2 bg-gray-50 border-b font-bold text-center text-blue-900 sticky top-0">{member.info.name}</div>
                                         <div className="flex-1 overflow-y-auto p-2">
                                             {TIME_SLOTS.map(time => (
-                                                <div key={time} className="flex border-b h-10 text-[10px] items-center">
-                                                    <div className="w-10 text-gray-400">{time}</div>
-                                                    <div className="flex-1 px-1">{dayLog.actuals?.[time] && <span className={`px-1 rounded text-white ${CATEGORIES.find(c=>c.id===dayLog.actuals[time].cat)?.color}`}>{dayLog.actuals[time].text}</span>}</div>
+                                                <div key={time} className="flex border-b h-12 text-xs items-center">
+                                                    <div className="w-12 text-gray-400 border-r pr-2">{time}</div>
+                                                    <div className="flex-1 px-2">{dayLog.actuals?.[time] && <span className={`block w-full py-1 px-2 rounded text-white ${CATEGORIES.find(c=>c.id===dayLog.actuals[time].cat)?.color}`}>{dayLog.actuals[time].text}</span>}</div>
                                                 </div>
                                             ))}
-                                            <div className="mt-4 border-t pt-2 space-y-2">
-                                                <div className="bg-blue-50 p-2 rounded"><div className="font-bold text-xs text-blue-600">AM</div><div className="text-xs">{dayLog.reflection?.am || '-'}</div></div>
-                                                <div className="bg-indigo-50 p-2 rounded"><div className="font-bold text-xs text-indigo-600">PM</div><div className="text-xs">{dayLog.reflection?.pm || '-'}</div></div>
-                                                <div className="bg-green-50 p-2 rounded border border-green-200">
-                                                    <div className="font-bold text-xs text-green-700 mb-1">上司コメント</div>
-                                                    <textarea id={`cmt-${member.uid}`} className="w-full text-xs border rounded p-1" rows="2" defaultValue={dayLog.supervisorComment || ""}></textarea>
-                                                    <button onClick={() => saveComment(member.uid, document.getElementById(`cmt-${member.uid}`).value)} className="mt-1 w-full bg-green-600 text-white text-xs py-1 rounded">送信</button>
+                                            <div className="mt-4 border-t pt-4 space-y-4 pb-20">
+                                                <div className="bg-blue-50 p-3 rounded-lg"><div className="font-bold text-xs text-blue-600 mb-1">AM</div><div className="text-sm">{dayLog.reflection?.am || '-'}</div></div>
+                                                <div className="bg-indigo-50 p-3 rounded-lg"><div className="font-bold text-xs text-indigo-600 mb-1">PM</div><div className="text-sm">{dayLog.reflection?.pm || '-'}</div></div>
+                                                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                                                    <div className="font-bold text-xs text-green-700 mb-2">上司コメント</div>
+                                                    <textarea id={`cmt-${member.uid}`} className="w-full text-sm border rounded p-2" rows="3" defaultValue={dayLog.supervisorComment || ""}></textarea>
+                                                    <button onClick={() => saveComment(member.uid, document.getElementById(`cmt-${member.uid}`).value)} className="mt-2 w-full bg-green-600 text-white text-sm py-2 rounded font-bold hover:bg-green-700 transition">送信</button>
                                                 </div>
                                             </div>
-                                            <div className="h-10"></div>
                                         </div>
                                     </div>
                                 );
@@ -362,6 +393,9 @@
                 </div>
             );
         };
+
+        // --- 以下、既存コンポーネント (DailyScreen, HomeScreen, etc.) はV41と同じ ---
+        // (コード量の都合上、上記修正点を反映しつつ全体を構築します)
 
         const DailyScreen = ({ user, currentDate, setCurrentDate, allData, setAllData, onSlotClick, onSaveReflection, isReflectOpen, setIsReflectOpen }) => {
             const chartRef = useRef(null); const canvasRef = useRef(null); const scrollRef = useRef(null);
@@ -482,6 +516,7 @@
             );
         };
 
+        // App Main
         const App = () => {
             const { user, userData, allData, loading, saveData, searchUsers, addTeamMember, removeTeamMember, fetchMemberData, updateUserRole, loginGoogle, logout } = useFirebaseData();
             const [view, setView] = useState('home');
@@ -494,7 +529,7 @@
             const [inputText, setInputText] = useState("");
             const [isReflectOpen, setIsReflectOpen] = useState(false);
 
-            if (loading) return <div id="loader">Loading...</div>;
+            if (loading) return <div id="loader"><div className="text-xl font-bold text-gray-600 mb-2">TimeWellth</div><div className="text-sm text-gray-400">Loading...</div></div>;
             if (!user) return <LoginScreen onLogin={loginGoogle} />;
             if (!userData) return <div className="h-screen flex items-center justify-center">Account Setup...</div>;
 
@@ -535,9 +570,7 @@
                         <button onClick={logout} className="text-[10px] md:text-xs bg-white/20 px-3 py-1.5 rounded text-white/90 hover:bg-white/30 transition border border-white/10">ログアウト</button>
                     </div>
 
-                    <div className="flex flex-1 overflow-hidden relative w-full bg-[#f8fafc] md:flex-row flex-col">
-                        
-                        {/* ★復活させたサイドバー (PC用) */}
+                    <div className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] md:flex-row flex-col">
                         <div className="hidden md:flex w-64 bg-white border-r flex-col shrink-0 z-30 p-4 gap-2">
                             <button onClick={() => setView('home')} className={`p-3 text-left font-bold rounded transition ${view==='home' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-home mr-2"></i>ホーム</button>
                             <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`p-3 text-left font-bold rounded transition ${view==='daily' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-calendar-day mr-2"></i>行動記録</button>
@@ -547,7 +580,6 @@
                             {isMaster && <button onClick={() => setView('admin')} className={`p-3 text-left font-bold rounded transition ${view==='admin' ? 'text-gray-800 bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-cog mr-2"></i>アカウント管理</button>}
                         </div>
 
-                        {/* メインコンテンツ */}
                         <div className="flex-1 overflow-y-auto w-full h-full">
                             {view === 'home' && <HomeScreen user={userData} todayStr={formatDate(new Date())} allData={allData} onViewChange={setView} />}
                             {view === 'daily' && <DailyScreen user={userData} currentDate={currentDate} setCurrentDate={setCurrentDate} allData={allData} setAllData={null} onSlotClick={handleSlotClick} onSaveReflection={handleReflection} isReflectOpen={isReflectOpen} setIsReflectOpen={setIsReflectOpen} />}
@@ -558,14 +590,12 @@
                         </div>
                     </div>
 
-                    {/* モバイル用フッター (V38同様) */}
                     <div className="md:hidden shrink-0 bg-white border-t border-gray-200 flex justify-around py-2 pb-safe z-40">
                         <button onClick={() => setView('home')} className={`flex flex-col items-center p-2 flex-1 ${view === 'home' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">ホーム</span></button>
                         <button onClick={() => { setCurrentDate(formatDate(new Date())); setView('daily'); }} className={`flex flex-col items-center p-2 flex-1 ${view === 'daily' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-calendar-day text-xl mb-1"></i><span className="text-[10px] font-bold">行動記録</span></button>
                         <button onClick={() => setView('history')} className={`flex flex-col items-center p-2 flex-1 ${view === 'history' ? 'text-blue-600' : 'text-gray-400'}`}><i className="fas fa-history text-xl mb-1"></i><span className="text-[10px] font-bold">履歴</span></button>
                     </div>
 
-                    {/* モーダル群 (入力、日報) */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50">
                             <div className="bg-white w-full max-w-md md:max-w-lg rounded-t-2xl md:rounded-2xl p-5 animate-slide-up shadow-2xl">
